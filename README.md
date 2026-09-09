@@ -12,13 +12,13 @@ Our goal is to make the device more useful in your day-to-day life without compr
 
 ## Features
 
-In addition to all the fantastic EPUB rendering, custom fonts, and library management features from the upstream CrossPoint project, **Teleport** includes a suite of applications and technical capabilities. Its companion app, [Teleport Hub](https://github.com/AsrorbekQ/teleport-hub), converts web pages, documents and RSS feeds to EPUB on your computer and syncs them over Wi-Fi.
+In addition to all the fantastic EPUB rendering, custom fonts, and library management features from the upstream CrossPoint project, **Teleport** includes a suite of applications and technical capabilities. Its companion app, [Teleport Nest](https://github.com/AsrorbekQ/teleport-nest), converts web pages, documents and RSS feeds to EPUB on your computer and syncs them over Wi-Fi.
 
 - **Markdown & HTML Parser**: Features a custom parser and renderer that gracefully strips HTML tags and translates basic Markdown, allowing web content (like RSS articles and Reddit) to be displayed elegantly in the native text reader engine.
 - **Flashcards**: Anki-style spaced repetition (SM-2) for a vocabulary deck stored on the SD card. Convert an `.apkg` export with `scripts/anki_to_deck.py` and copy the result to `/apps/flashcards/gre.deck`.
 - **Habits**: Daily habit check-ins with streaks and a 12-week completion grid. Fully offline; only needs the clock synced once.
-- **Read Later**: Queue web pages from [Teleport Hub](https://github.com/AsrorbekQ/teleport-hub) (or `POST /api/readlater`); the device fetches and caches them for offline reading.
-- **Briefing**: A morning dashboard with the date, weather (Open-Meteo), today's Todoist tasks, habit streaks and flashcards due. Optionally fetched at sleep time and left on the e-ink screen overnight. Configure it from Teleport Hub.
+- **Read Later**: Queue web pages from [Teleport Nest](https://github.com/AsrorbekQ/teleport-nest) (or `POST /api/readlater`); the device fetches and caches them for offline reading.
+- **Briefing**: A morning dashboard with the date, weather (Open-Meteo), today's Todoist tasks, habit streaks and flashcards due. Optionally fetched at sleep time and left on the e-ink screen overnight. Configure it from Teleport Nest.
 - **Dice & 8-Ball**: A handy utility for tabletop gamers. Roll D6, D20, spin arrows, flip coins, or consult the Magic 8-Ball.
 - **RSS Feed & Reddit**: Subscribe to your favorite blogs and news sites. Articles are downloaded and cached for distraction-free, offline reading using the native text reader engine.
 
