@@ -17,6 +17,7 @@
 #include "SettingsList.h"
 #include "WebDAVHandler.h"
 #include "WifiCredentialStore.h"
+#include "activities/readlater/ReadLaterStore.h"
 #include "html/FilesPageHtml.generated.h"
 #include "html/FontsPageHtml.generated.h"
 #include "html/HomePageHtml.generated.h"
@@ -174,6 +175,10 @@ void CrossPointWebServer::begin() {
   server->on("/api/wifi", HTTP_GET, [this] { handleGetWifiNetworks(); });
   server->on("/api/wifi", HTTP_POST, [this] { handlePostWifiNetwork(); });
   server->on("/api/wifi/delete", HTTP_POST, [this] { handleDeleteWifiNetwork(); });
+
+  // Read Later queue (used by Teleport Hub)
+  server->on("/api/readlater", HTTP_GET, [this] { handleReadLaterGet(); });
+  server->on("/api/readlater", HTTP_POST, [this] { handleReadLaterPost(); });
 
   server->onNotFound([this] { handleNotFound(); });
   LOG_DBG("WEB", "[MEM] Free heap after route setup: %d bytes", ESP.getFreeHeap());
@@ -748,6 +753,36 @@ void CrossPointWebServer::handleUploadPost(UploadState& state) const {
     const String error = state.error.isEmpty() ? "Unknown error during upload" : state.error;
     server->send(400, "text/plain", error);
   }
+}
+
+void CrossPointWebServer::handleReadLaterGet() const {
+  HalFile file;
+  if (!Storage.openFileForRead("WEB", ReadLaterStore::QUEUE_PATH, file)) {
+    server->send(200, "text/plain", "");
+    return;
+  }
+  String content;
+  content.reserve(file.size());
+  while (file.available() > 0) content += static_cast<char>(file.read());
+  server->send(200, "text/plain", content);
+}
+
+void CrossPointWebServer::handleReadLaterPost() const {
+  if (!server->hasArg("url")) {
+    server->send(400, "application/json", "{\"ok\":false,\"error\":\"missing url\"}");
+    return;
+  }
+  const String url = server->arg("url");
+  if (!url.startsWith("http://") && !url.startsWith("https://")) {
+    server->send(400, "application/json", "{\"ok\":false,\"error\":\"url must start with http(s)://\"}");
+    return;
+  }
+  const String title = server->hasArg("title") ? server->arg("title") : "";
+  if (!ReadLaterStore::appendUrl(url.c_str(), title.c_str())) {
+    server->send(500, "application/json", "{\"ok\":false,\"error\":\"write failed\"}");
+    return;
+  }
+  server->send(200, "application/json", "{\"ok\":true}");
 }
 
 void CrossPointWebServer::handleCreateFolder() const {

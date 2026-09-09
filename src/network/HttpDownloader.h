@@ -39,6 +39,11 @@ class HttpDownloader {
                        const std::string& password = "");
 
   /**
+   * Stream a GET with an "Authorization: Bearer <token>" header (API calls).
+   */
+  static bool fetchUrlBearer(const std::string& url, const std::string& bearerToken, const DataCallback& onData);
+
+  /**
    * Download a file to the SD card with optional credentials.
    */
   static DownloadError downloadToFile(const std::string& url, const std::string& destPath,

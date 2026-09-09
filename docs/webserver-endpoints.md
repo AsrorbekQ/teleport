@@ -249,6 +249,20 @@ All items deleted successfully
 
 ## WebSocket Endpoint
 
+### GET `/api/readlater` - Read Later Queue
+
+Returns `/apps/readlater/queue.txt` as `text/plain` (one `url<TAB>title` per line).
+
+### POST `/api/readlater` - Queue a Page for Read Later
+
+Appends a URL to the Read Later queue. The device fetches the page on demand from the Read Later app.
+
+```bash
+curl -X POST -d "url=https://example.com/article" -d "title=Example" http://crosspoint.local/api/readlater
+```
+
+Response: `{"ok":true}`. A URL already in the queue is ignored.
+
 ### Port 81 - Fast Binary Upload
 
 A WebSocket endpoint for high-speed binary file uploads. More efficient than HTTP multipart for large files.

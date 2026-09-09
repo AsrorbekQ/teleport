@@ -92,7 +92,8 @@ esp_err_t captureResponseHeaders(esp_http_client_event_t* evt) {
 // large/slow files and surfaces a short read directly.
 HttpDownloader::DownloadError runGet(const std::string& url, const std::string& username, const std::string& password,
                                      Sink& sink, std::string* outContentType = nullptr,
-                                     std::string* outFinalUrl = nullptr, std::string* outErrorDetail = nullptr) {
+                                     std::string* outFinalUrl = nullptr, std::string* outErrorDetail = nullptr,
+                                     const std::string& bearerToken = "") {
   std::string currentUrl = url;
   int hop = 0;
   esp_http_client_handle_t client = nullptr;
@@ -133,6 +134,9 @@ HttpDownloader::DownloadError runGet(const std::string& url, const std::string& 
     if (!username.empty() && !password.empty()) {
       const std::string credentials = username + ":" + password;
       const String header = "Basic " + base64::encode(credentials.c_str());
+      esp_http_client_set_header(client, "Authorization", header.c_str());
+    } else if (!bearerToken.empty()) {
+      const std::string header = "Bearer " + bearerToken;
       esp_http_client_set_header(client, "Authorization", header.c_str());
     }
 
@@ -265,6 +269,14 @@ bool HttpDownloader::fetchUrl(const std::string& url, const DataCallback& onData
   Sink sink;
   sink.write = onData;
   return runGet(url, username, password, sink) == OK;
+}
+
+bool HttpDownloader::fetchUrlBearer(const std::string& url, const std::string& bearerToken,
+                                    const DataCallback& onData) {
+  LOG_DBG("HTTP", "Fetching (bearer): %s", url.c_str());
+  Sink sink;
+  sink.write = onData;
+  return runGet(url, "", "", sink, nullptr, nullptr, nullptr, bearerToken) == OK;
 }
 
 HttpDownloader::DownloadError HttpDownloader::downloadToFile(const std::string& url, const std::string& destPath,

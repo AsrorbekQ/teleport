@@ -1,8 +1,10 @@
 #include "AppRegistry.h"
 
+#include "activities/briefing/BriefingActivity.h"
 #include "activities/dice/DiceActivity.h"
 #include "activities/flashcards/FlashcardsActivity.h"
 #include "activities/habits/HabitsActivity.h"
+#include "activities/readlater/ReadLaterActivity.h"
 #include "activities/rss/RssActivity.h"
 
 // System Activities
@@ -62,6 +64,16 @@ AppRegistry::AppRegistry() {
   apps.push_back(std::make_unique<App>(
       []() { return tr(STR_HABITS); }, UIIcon::Habits,
       [](GfxRenderer& r, MappedInputManager& i) { return std::make_unique<HabitsActivity>(r, i); }));
+
+  // Read Later App
+  apps.push_back(std::make_unique<App>(
+      []() { return tr(STR_READ_LATER); }, UIIcon::ReadLater,
+      [](GfxRenderer& r, MappedInputManager& i) { return std::make_unique<ReadLaterActivity>(r, i); }));
+
+  // Briefing App
+  apps.push_back(std::make_unique<App>(
+      []() { return tr(STR_BRIEFING); }, UIIcon::Dashboard,
+      [](GfxRenderer& r, MappedInputManager& i) { return std::make_unique<BriefingActivity>(r, i); }));
 
   // RSS Feed App
   apps.push_back(std::make_unique<App>("RSS Feed", UIIcon::Rss, [](GfxRenderer& r, MappedInputManager& i) {

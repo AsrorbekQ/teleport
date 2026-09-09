@@ -6,15 +6,19 @@
 #include <HalStorage.h>
 #include <I18n.h>
 #include <Txt.h>
+#include <WiFi.h>
 #include <Xtc.h>
 
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
+#include "activities/briefing/Briefing.h"
 #include "activities/reader/ReaderUtils.h"
+#include "activities/util/WifiConnectHelper.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "images/Logo120.h"
 #include "images/MoonIcon.h"
+#include "util/DateUtils.h"
 
 void SleepActivity::onEnter() {
   Activity::onEnter();
@@ -37,6 +41,10 @@ void SleepActivity::onEnter() {
     GUI.drawPopup(renderer, tr(STR_ENTERING_SLEEP));
   }
 
+  if (Briefing::loadConfig().enabled) {
+    return renderBriefingSleepScreen();
+  }
+
   switch (SETTINGS.sleepScreen) {
     case (CrossPointSettings::SLEEP_SCREEN_MODE::BLANK):
       return renderBlankSleepScreen();
@@ -53,6 +61,30 @@ void SleepActivity::onEnter() {
     default:
       return renderDefaultSleepScreen();
   }
+}
+
+// Morning briefing as the sleep screen: fetch fresh data now (at most every few hours,
+// never on a low battery), then leave the rendered page on the e-ink while powered off.
+void SleepActivity::renderBriefingSleepScreen() const {
+  const Briefing::Config config = Briefing::loadConfig();
+  Briefing::Data data;
+  Briefing::loadCache(data);
+  if (Briefing::shouldRefreshAtSleep(config, data)) {
+    GUI.drawPopup(renderer, tr(STR_BF_UPDATING));
+    renderer.displayBuffer();
+    if (WifiConnectHelper::connectToDefaultWifi()) {
+      if (!DateUtils::hasValidTime()) WifiConnectHelper::waitForTimeSync();
+      std::string error;
+      if (Briefing::refresh(config, data, error)) Briefing::saveCache(data);
+      if (!error.empty()) LOG_ERR("SLP", "Briefing refresh: %s", error.c_str());
+    } else {
+      LOG_ERR("SLP", "Briefing refresh skipped: no Wi-Fi");
+    }
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+  }
+  Briefing::render(renderer, config, data);
+  renderer.displayBuffer(HalDisplay::HALF_REFRESH);
 }
 
 void SleepActivity::renderCustomSleepScreen() const {

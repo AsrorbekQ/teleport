@@ -16,10 +16,11 @@ class HabitsActivity final : public Activity {
   void loop() override;
   void render(RenderLock&&) override;
 
+  static constexpr const char* STORE_PATH = "/apps/habits/habits.bin";
+
  private:
   enum class Screen : uint8_t { NoClock, List, Details, ConfirmDelete };
 
-  static constexpr const char* STORE_PATH = "/apps/habits/habits.bin";
   static constexpr uint8_t GRID_WEEKS = 12;
 
   Screen screen = Screen::List;

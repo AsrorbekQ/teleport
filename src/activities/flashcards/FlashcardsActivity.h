@@ -19,11 +19,12 @@ class FlashcardsActivity final : public Activity {
   void loop() override;
   void render(RenderLock&&) override;
 
+  static constexpr const char* DECK_PATH = "/apps/flashcards/gre.deck";
+  static constexpr const char* PROGRESS_PATH = "/apps/flashcards/gre.prog";
+
  private:
   enum class Screen : uint8_t { NoClock, NoDeck, Overview, Question, Answer, Done };
 
-  static constexpr const char* DECK_PATH = "/apps/flashcards/gre.deck";
-  static constexpr const char* PROGRESS_PATH = "/apps/flashcards/gre.prog";
   static constexpr uint8_t RATINGS_PER_SAVE = 10;
   static constexpr uint8_t NEW_PER_DAY_STEP = 5;
 

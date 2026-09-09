@@ -14,6 +14,8 @@
 #include "components/UITheme.h"
 #include "components/icons/book.h"
 #include "components/icons/book24.h"
+#include "components/icons/briefing.h"
+#include "components/icons/briefing24.h"
 #include "components/icons/clock.h"
 #include "components/icons/clock24.h"
 #include "components/icons/cover.h"
@@ -29,6 +31,8 @@
 #include "components/icons/hotspot.h"
 #include "components/icons/image24.h"
 #include "components/icons/library.h"
+#include "components/icons/readlater.h"
+#include "components/icons/readlater24.h"
 #include "components/icons/recent.h"
 #include "components/icons/rss.h"
 #include "components/icons/rss24.h"
@@ -72,6 +76,10 @@ const uint8_t* iconForName(UIIcon icon, int size) {
         return Flashcards24Icon;
       case UIIcon::Habits:
         return Habits24Icon;
+      case UIIcon::ReadLater:
+        return ReadLater24Icon;
+      case UIIcon::Dashboard:
+        return Briefing24Icon;
       default:
         return nullptr;
     }
@@ -103,6 +111,10 @@ const uint8_t* iconForName(UIIcon icon, int size) {
         return FlashcardsIcon;
       case UIIcon::Habits:
         return HabitsIcon;
+      case UIIcon::ReadLater:
+        return ReadLaterIcon;
+      case UIIcon::Dashboard:
+        return BriefingIcon;
       default:
         return nullptr;
     }
