@@ -1007,13 +1007,14 @@ void RssActivity::downloadActivePost() {
     std::string tempPath = "/websites/temp_download.tmp";
 
     bool success = false;
-    int retries = 3;
+    int retries = 1;
+    std::string downloadError;
 
     while (retries > 0) {
       GUI.drawPopup(renderer, "Downloading...");
 
-      auto result = HttpDownloader::downloadToFile(
-          downloadUrl.c_str(), tempPath.c_str(), nullptr, nullptr, "", "");
+      auto result = HttpDownloader::downloadToFile(downloadUrl.c_str(), tempPath.c_str(), nullptr, nullptr, "", "",
+                                                   nullptr, nullptr, &downloadError);
       if (result == HttpDownloader::OK) {
         success = true;
         break;
@@ -1082,7 +1083,8 @@ void RssActivity::downloadActivePost() {
                               allItems[selectedItemIndex].content);
       }
 
-      GUI.drawPopup(renderer, "Download failed!");
+      errorMessage = downloadError.empty() ? "Download failed" : "Download failed: " + downloadError;
+      GUI.drawPopup(renderer, errorMessage.c_str());
       delay(2000);
       requestUpdate();
     }
@@ -1176,7 +1178,8 @@ void RssActivity::loop() {
     if (timedOut) {
       errorMessage = "Request timed out.";
     } else if (allItems.empty()) {
-      errorMessage = "Offline. No cached feed items found.";
+      // Keep the HTTP error detail from the fetch task; it is far more useful than a generic message.
+      if (errorMessage.empty()) errorMessage = "Offline. No cached feed items found.";
     } else {
       errorMessage.clear();
     }
@@ -1418,7 +1421,9 @@ void RssActivity::loop() {
       }
     }
   } else if (state == RssState::PostDetail) {
-    if (mappedInput.wasReleased(MappedInputManager::Button::Up)) {
+    if (mappedInput.wasReleased(MappedInputManager::Button::Left)) {
+      saveDiagnosticLog();
+    } else if (mappedInput.wasReleased(MappedInputManager::Button::Up)) {
       if (detailScrollOffset > 0) {
         detailScrollOffset--;
         requestUpdate();
@@ -1604,7 +1609,7 @@ void RssActivity::render(RenderLock &&) {
     }
 
     const auto labels =
-        mappedInput.mapLabels(tr(STR_BACK), "Visit Link", nullptr, nullptr);
+        mappedInput.mapLabels(tr(STR_BACK), "Visit Link", tr(STR_SAVE_LOG), nullptr);
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3,
                         labels.btn4);
   } else if (state == RssState::FeedSelection) {
