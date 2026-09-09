@@ -70,6 +70,20 @@ std::string resolveRedirectUrl(const std::string& base, const std::string& redir
   return base + "/" + redirect;
 }
 
+// esp_http_client_get_header() only reads *request* headers, so the redirect
+// target must be captured from the response header event instead.
+struct ResponseCapture {
+  std::string location;
+};
+
+esp_err_t captureResponseHeaders(esp_http_client_event_t* evt) {
+  if (evt->event_id == HTTP_EVENT_ON_HEADER && evt->user_data && evt->header_key && evt->header_value &&
+      strcasecmp(evt->header_key, "Location") == 0) {
+    static_cast<ResponseCapture*>(evt->user_data)->location = evt->header_value;
+  }
+  return ESP_OK;
+}
+
 // Streams a GET body through sink.write in READ_CHUNK pieces. Uses the manual
 // open/fetch_headers/read path rather than esp_http_client_perform(): perform()
 // pushes the whole body through an event callback and reports a chunked body
@@ -86,8 +100,11 @@ HttpDownloader::DownloadError runGet(const std::string& url, const std::string& 
   int64_t contentLength = 0;
 
   while (hop < 10) {
+    ResponseCapture capture;
     esp_http_client_config_t config = {};
     config.url = currentUrl.c_str();
+    config.event_handler = captureResponseHeaders;
+    config.user_data = &capture;
     config.buffer_size = HTTP_RX_BUF;
     config.buffer_size_tx = HTTP_TX_BUF;
     config.timeout_ms = HTTP_TIMEOUT_MS;
@@ -131,10 +148,8 @@ HttpDownloader::DownloadError runGet(const std::string& url, const std::string& 
             static_cast<long long>(contentLength), static_cast<unsigned>(ESP.getFreeHeap()));
 
     if (isRedirect(status)) {
-      char* loc = nullptr;
-      esp_http_client_get_header(client, "Location", &loc);
-      if (loc && strlen(loc) > 0) {
-        std::string nextUrl = resolveRedirectUrl(currentUrl, loc);
+      if (!capture.location.empty()) {
+        std::string nextUrl = resolveRedirectUrl(currentUrl, capture.location.c_str());
         LOG_DBG("HTTP", "Redirecting from %s to: %s", currentUrl.c_str(), nextUrl.c_str());
         currentUrl = nextUrl;
         esp_http_client_cleanup(client);
