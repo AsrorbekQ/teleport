@@ -99,10 +99,29 @@ int32_t HabitStore::slotFor(uint32_t day) const {
 
 void HabitStore::ensureWindowCovers(uint32_t day) {
   if (windowStart == 0) {
-    windowStart = day;
+    // Fresh store: leave room before today so backfilled or timezone-shifted days fit.
+    windowStart = day > WINDOW_DAYS / 2 ? day - WINDOW_DAYS / 2 : 0;
     return;
   }
-  if (day < windowStart || day - windowStart < WINDOW_DAYS) return;
+  if (day < windowStart) {
+    // Move the window back (bits shift later). A jump of months back means a wrong clock, so keep history.
+    const uint32_t shift = windowStart - day + SHIFT_HEADROOM;
+    if (shift > WINDOW_DAYS / 2) {
+      LOG_ERR(TAG, "Day %lu is far before window start %lu, ignoring", static_cast<unsigned long>(day),
+              static_cast<unsigned long>(windowStart));
+      return;
+    }
+    for (uint8_t h = 0; h < habitCount; h++) {
+      uint8_t shifted[WINDOW_DAYS / 8] = {0};
+      for (uint32_t i = 0; i + shift < WINDOW_DAYS; i++) {
+        if (getBit(habits[h].days, static_cast<uint16_t>(i))) setBit(shifted, static_cast<uint16_t>(i + shift), true);
+      }
+      memcpy(habits[h].days, shifted, sizeof(shifted));
+    }
+    windowStart -= shift;
+    return;
+  }
+  if (day - windowStart < WINDOW_DAYS) return;
 
   const uint32_t shift = day - windowStart - (WINDOW_DAYS - 1) + SHIFT_HEADROOM;
   for (uint8_t h = 0; h < habitCount; h++) {

@@ -63,7 +63,9 @@ def read_bin(path: str):
 def write_bin(path: str, habits, today: dt.date):
     all_days = [d for _n, days in habits for d in days]
     today_index = day_index(today)
-    window_start = min(all_days + [today_index]) if habits else 0
+    # Start the window a month before the earliest day so the device can still record
+    # earlier dates (e.g. its clock is a few hours behind this computer's local date).
+    window_start = (min(all_days + [today_index]) - 30) if habits else 0
     # Leave the device 30 days before it has to shift the window itself.
     earliest_allowed = today_index - (WINDOW_DAYS - 31)
     if window_start < earliest_allowed:
