@@ -188,7 +188,7 @@ void FlashcardsActivity::render(RenderLock&&) {
   renderer.clearScreen();
   switch (screen) {
     case Screen::NoClock:
-      renderMessage(tr(STR_FC_CLOCK_NOT_SET), tr(STR_FC_CLOCK_HINT));
+      renderMessage(tr(STR_APP_CLOCK_NOT_SET), tr(STR_APP_CLOCK_HINT));
       break;
     case Screen::NoDeck:
       renderMessage(tr(STR_FC_DECK_MISSING), tr(STR_FC_DECK_MISSING_HINT));

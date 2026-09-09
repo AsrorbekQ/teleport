@@ -3,6 +3,7 @@
 #include "activities/dice/DiceActivity.h"
 #include "activities/duckduckgo/DuckDuckGoActivity.h"
 #include "activities/flashcards/FlashcardsActivity.h"
+#include "activities/habits/HabitsActivity.h"
 #include "activities/rss/RssActivity.h"
 #include "activities/wikipedia/WikipediaActivity.h"
 
@@ -58,6 +59,11 @@ AppRegistry::AppRegistry() {
   apps.push_back(std::make_unique<App>(
       []() { return tr(STR_FLASHCARDS); }, UIIcon::Flashcards,
       [](GfxRenderer& r, MappedInputManager& i) { return std::make_unique<FlashcardsActivity>(r, i); }));
+
+  // Habits App
+  apps.push_back(std::make_unique<App>(
+      []() { return tr(STR_HABITS); }, UIIcon::Habits,
+      [](GfxRenderer& r, MappedInputManager& i) { return std::make_unique<HabitsActivity>(r, i); }));
 
   // DuckDuckGo App
   apps.push_back(std::make_unique<App>("DuckDuckGo", UIIcon::DuckDuckGo, [](GfxRenderer& r, MappedInputManager& i) {

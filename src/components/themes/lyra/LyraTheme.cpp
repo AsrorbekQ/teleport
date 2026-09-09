@@ -26,6 +26,8 @@
 #include "components/icons/flashcards24.h"
 #include "components/icons/folder.h"
 #include "components/icons/folder24.h"
+#include "components/icons/habits.h"
+#include "components/icons/habits24.h"
 #include "components/icons/hotspot.h"
 #include "components/icons/image24.h"
 #include "components/icons/library.h"
@@ -76,6 +78,8 @@ const uint8_t* iconForName(UIIcon icon, int size) {
         return Rss24Icon;
       case UIIcon::Flashcards:
         return Flashcards24Icon;
+      case UIIcon::Habits:
+        return Habits24Icon;
       default:
         return nullptr;
     }
@@ -109,6 +113,8 @@ const uint8_t* iconForName(UIIcon icon, int size) {
         return RssIcon;
       case UIIcon::Flashcards:
         return FlashcardsIcon;
+      case UIIcon::Habits:
+        return HabitsIcon;
       default:
         return nullptr;
     }

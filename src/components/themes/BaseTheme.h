@@ -114,7 +114,8 @@ enum UIIcon {
   Dice,
   DuckDuckGo,
   Rss,
-  Flashcards
+  Flashcards,
+  Habits
 };
 
 enum class KeyboardKeyType { Normal, Shift, Mode, Space, Del, Ok, Disabled };
