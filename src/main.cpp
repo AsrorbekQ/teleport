@@ -100,8 +100,6 @@ EpdFontFamily notosans48EmojiFontFamily(&notosans48EmojiRegularFont, nullptr, nu
 EpdFont notosans16EmojiRegularFont(&notosans_16_emoji);
 EpdFontFamily notosans16EmojiFontFamily(&notosans16EmojiRegularFont, nullptr, nullptr, nullptr);
 
-
-
 EpdFont opendyslexic8RegularFont(&opendyslexic_8_regular);
 EpdFont opendyslexic8BoldFont(&opendyslexic_8_bold);
 EpdFont opendyslexic8ItalicFont(&opendyslexic_8_italic);
@@ -334,8 +332,6 @@ void setupDisplayAndFonts(bool seamless = false) {
   renderer.insertFont(NOTOSANS_48_EMOJI_FONT_ID, notosans48EmojiFontFamily);
   renderer.insertFont(NOTOSANS_16_EMOJI_FONT_ID, notosans16EmojiFontFamily);
 
-
-
   // Discover and load SD card fonts
   sdFontSystem.begin(renderer);
 
@@ -353,6 +349,7 @@ void setup() {
   // worked without the delay because USB was already enumerated.
   delay(250);
   Serial.begin(115200);
+  installEspLogHook();
   logSerial.setTxTimeoutMs(1);  // This is a load-bearing 1. Do not modify.
 #endif
 

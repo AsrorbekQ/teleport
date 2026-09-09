@@ -6,12 +6,12 @@
 #include <base64.h>
 #include <esp_crt_bundle.h>
 #include <esp_http_client.h>
-#include "activities/RenderLock.h"
 
 #include <cstring>
 #include <functional>
 #include <string>
 
+#include "activities/RenderLock.h"
 
 namespace {
 // RX holds the response headers. 4096 fits real OPDS servers; GitHub's release
@@ -76,8 +76,8 @@ std::string resolveRedirectUrl(const std::string& base, const std::string& redir
 // that ends early as ESP_ERR_HTTP_INCOMPLETE_DATA, whereas the read loop streams
 // large/slow files and surfaces a short read directly.
 HttpDownloader::DownloadError runGet(const std::string& url, const std::string& username, const std::string& password,
-                                     Sink& sink, std::string* outContentType = nullptr, std::string* outFinalUrl = nullptr,
-                                     std::string* outErrorDetail = nullptr) {
+                                     Sink& sink, std::string* outContentType = nullptr,
+                                     std::string* outFinalUrl = nullptr, std::string* outErrorDetail = nullptr) {
   std::string currentUrl = url;
   int hop = 0;
   esp_http_client_handle_t client = nullptr;
@@ -94,6 +94,8 @@ HttpDownloader::DownloadError runGet(const std::string& url, const std::string& 
     // Verify HTTPS against the bundled CA roots.
     config.crt_bundle_attach = esp_crt_bundle_attach;
     config.keep_alive_enable = true;
+    // The device never gets a routable IPv6 address; resolving AAAA first can stall connects.
+    config.addr_type = HTTP_ADDR_TYPE_INET;
 
     client = esp_http_client_init(&config);
     if (!client) {
@@ -102,23 +104,31 @@ HttpDownloader::DownloadError runGet(const std::string& url, const std::string& 
       return HttpDownloader::HTTP_ERROR;
     }
 
-    esp_http_client_set_header(client, "User-Agent", "CrossPointReader/1.0 (https://github.com/zakerytclarke/crosspoint-reader-apps)");
+    esp_http_client_set_header(client, "User-Agent",
+                               "CrossPointReader/1.0 (https://github.com/zakerytclarke/crosspoint-reader-apps)");
     if (!username.empty() && !password.empty()) {
       const std::string credentials = username + ":" + password;
       const String header = "Basic " + base64::encode(credentials.c_str());
       esp_http_client_set_header(client, "Authorization", header.c_str());
     }
 
+    const unsigned long openStart = millis();
     err = esp_http_client_open(client, 0);
     if (err != ESP_OK) {
-      LOG_ERR("HTTP", "open failed: %s", esp_err_to_name(err));
-      if (outErrorDetail) *outErrorDetail = std::string("Open failed: ") + esp_err_to_name(err);
+      const int sockErrno = esp_http_client_get_errno(client);
+      LOG_ERR("HTTP", "open failed: %s errno=%d after %lu ms heap=%u", esp_err_to_name(err), sockErrno,
+              millis() - openStart, static_cast<unsigned>(ESP.getFreeHeap()));
+      if (outErrorDetail) {
+        *outErrorDetail = std::string("Open failed: ") + esp_err_to_name(err) + " errno " + std::to_string(sockErrno);
+      }
       esp_http_client_cleanup(client);
       return HttpDownloader::HTTP_ERROR;
     }
 
     contentLength = esp_http_client_fetch_headers(client);
     status = esp_http_client_get_status_code(client);
+    LOG_INF("HTTP", "%s -> %d in %lu ms, len %lld, heap %u", currentUrl.c_str(), status, millis() - openStart,
+            static_cast<long long>(contentLength), static_cast<unsigned>(ESP.getFreeHeap()));
 
     if (isRedirect(status)) {
       char* loc = nullptr;

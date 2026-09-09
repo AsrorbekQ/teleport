@@ -910,7 +910,7 @@ bool RssActivity::loadOfflineFeeds() {
 }
 
 void RssActivity::runBackgroundFetch() {
-  DownloadWatchdog::start(60000);
+  DownloadWatchdog::start(75000);
   errorMessage.clear();
 
   bool anySuccess = false;
@@ -929,7 +929,7 @@ void RssActivity::runBackgroundFetch() {
 
       Storage.remove(xmlPath.c_str());
 
-      int fetchRetries = 3;
+      int fetchRetries = 1;  // one 60 s socket timeout must finish before the 75 s watchdog
       bool fetchSuccess = false;
 
       while (fetchRetries > 0 && !cancelFetch) {
@@ -1143,6 +1143,29 @@ void RssActivity::onExit() {
   }
 }
 
+void RssActivity::saveDiagnosticLog() {
+  HalFile f;
+  if (!Storage.openFileForWrite("RSS", "/log.txt", f)) {
+    LOG_ERR("RSS", "Cannot write /log.txt");
+    return;
+  }
+  char header[160];
+  snprintf(header, sizeof(header), "Teleport diagnostic log\nfeed: %s\nerror: %s\nheap: %u\ntime valid: %d\n---\n",
+           activeFeed.c_str(), errorMessage.c_str(), static_cast<unsigned>(ESP.getFreeHeap()),
+           static_cast<int>(time(nullptr) > 1600000000));
+  f.write(header, strlen(header));
+  const std::string logs = getRecentLogs();
+  f.write(logs.data(), logs.size());
+  f.close();
+  {
+    RenderLock lock;
+    GUI.drawPopup(renderer, tr(STR_LOG_SAVED));
+    renderer.displayBuffer();
+  }
+  delay(1500);
+  requestUpdate();
+}
+
 void RssActivity::loop() {
   if (pendingUpdateFeed) {
     pendingUpdateFeed = false;
@@ -1235,7 +1258,7 @@ void RssActivity::loop() {
                     ensureWifiConnected(
                         [this]() {
                           wifiWasUsed = true;
-                          xTaskCreate(rssFetchTaskFunc, "rss_fetch", 8192, this,
+                          xTaskCreate(rssFetchTaskFunc, "rss_fetch", 10240, this,
                                       5, (TaskHandle_t *)&fetchTaskHandle);
                         },
                         [this]() {
@@ -1249,7 +1272,7 @@ void RssActivity::loop() {
                     ensureWifiConnected(
                         [this]() {
                           wifiWasUsed = true;
-                          xTaskCreate(rssFetchTaskFunc, "rss_fetch", 8192, this,
+                          xTaskCreate(rssFetchTaskFunc, "rss_fetch", 10240, this,
                                       5, (TaskHandle_t *)&fetchTaskHandle);
                         },
                         [this]() {
@@ -1286,7 +1309,7 @@ void RssActivity::loop() {
           ensureWifiConnected(
               [this]() {
                 wifiWasUsed = true;
-                xTaskCreate(rssFetchTaskFunc, "rss_fetch", 8192, this, 5,
+                xTaskCreate(rssFetchTaskFunc, "rss_fetch", 10240, this, 5,
                             (TaskHandle_t *)&fetchTaskHandle);
               },
               [this]() {
@@ -1329,7 +1352,7 @@ void RssActivity::loop() {
       ensureWifiConnected(
           [this]() {
             wifiWasUsed = true;
-            xTaskCreate(rssFetchTaskFunc, "rss_fetch", 8192, this, 5,
+            xTaskCreate(rssFetchTaskFunc, "rss_fetch", 10240, this, 5,
                         (TaskHandle_t *)&fetchTaskHandle);
           },
           [this]() {
@@ -1340,6 +1363,10 @@ void RssActivity::loop() {
       return;
     }
     if (allItems.empty()) {
+      if (mappedInput.wasReleased(MappedInputManager::Button::Left)) {
+        saveDiagnosticLog();
+        return;
+      }
       if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
         isRefreshing = true;
         state = RssState::Loading;
@@ -1347,7 +1374,7 @@ void RssActivity::loop() {
         ensureWifiConnected(
             [this]() {
               wifiWasUsed = true;
-              xTaskCreate(rssFetchTaskFunc, "rss_fetch", 8192, this, 5,
+              xTaskCreate(rssFetchTaskFunc, "rss_fetch", 10240, this, 5,
                           (TaskHandle_t *)&fetchTaskHandle);
             },
             [this]() {
@@ -1501,8 +1528,8 @@ void RssActivity::render(RenderLock &&) {
       }
     }
 
-    const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT),
-                                              "Details", "Refresh");
+    const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), allItems.empty() ? tr(STR_SAVE_LOG) : "Details",
+                                              "Refresh");
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3,
                         labels.btn4);
   } else if (state == RssState::PostDetail) {

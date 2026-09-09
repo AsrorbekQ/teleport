@@ -56,6 +56,10 @@ void logPrintf(const char* level, const char* origin, const char* format, ...);
 #endif
 
 std::string getLastLogs();
+// Larger DRAM-only ring of recent log lines (lost on reboot). Also receives ESP-IDF
+// component logs once installEspLogHook() has run, so TLS/HTTP errors are captured.
+std::string getRecentLogs();
+void installEspLogHook();
 void clearLastLogs();
 // Validates the RTC log state (magic word + logHead range). Returns true if
 // corruption was detected (magic mismatch or logHead out of range), meaning
