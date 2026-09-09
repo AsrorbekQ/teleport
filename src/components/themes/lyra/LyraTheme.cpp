@@ -26,20 +26,12 @@
 #include "components/icons/text24.h"
 #include "components/icons/transfer.h"
 #include "components/icons/wifi.h"
-#include "components/icons/calculator.h"
-#include "components/icons/calculator24.h"
-#include "components/icons/weather.h"
-#include "components/icons/weather24.h"
-#include "components/icons/sudoku.h"
-#include "components/icons/sudoku24.h"
 #include "components/icons/duckduckgo.h"
 #include "components/icons/duckduckgo24.h"
 #include "components/icons/clock.h"
 #include "components/icons/clock24.h"
 #include "components/icons/wikipedia.h"
 #include "components/icons/wikipedia24.h"
-#include "components/icons/chess.h"
-#include "components/icons/chess24.h"
 #include "components/icons/dice.h"
 #include "components/icons/dice24.h"
 #include "components/icons/rss.h"
@@ -71,18 +63,10 @@ const uint8_t* iconForName(UIIcon icon, int size) {
         return Book24Icon;
       case UIIcon::File:
         return File24Icon;
-      case UIIcon::Calculator:
-        return Calculator24Icon;
-      case UIIcon::Weather:
-        return Weather24Icon;
-      case UIIcon::Sudoku:
-        return Sudoku24Icon;
       case UIIcon::Clock:
         return Clock24Icon;
       case UIIcon::Wikipedia:
         return Wikipedia24Icon;
-      case UIIcon::Chess:
-        return Chess24Icon;
       case UIIcon::Dice:
         return Dice24Icon;
       case UIIcon::DuckDuckGo:
@@ -110,18 +94,10 @@ const uint8_t* iconForName(UIIcon icon, int size) {
         return WifiIcon;
       case UIIcon::Hotspot:
         return HotspotIcon;
-      case UIIcon::Calculator:
-        return CalculatorIcon;
-      case UIIcon::Weather:
-        return WeatherIcon;
-      case UIIcon::Sudoku:
-        return SudokuIcon;
       case UIIcon::Clock:
         return ClockIcon;
       case UIIcon::Wikipedia:
         return WikipediaIcon;
-      case UIIcon::Chess:
-        return ChessIcon;
       case UIIcon::Dice:
         return DiceIcon;
       case UIIcon::DuckDuckGo:
