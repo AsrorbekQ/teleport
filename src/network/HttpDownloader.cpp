@@ -11,6 +11,7 @@
 #include <functional>
 #include <string>
 
+#include "CrtBundle.generated.h"
 #include "activities/RenderLock.h"
 
 namespace {
@@ -101,6 +102,12 @@ HttpDownloader::DownloadError runGet(const std::string& url, const std::string& 
 
   while (hop < 10) {
     ResponseCapture capture;
+    // Roots plus common intermediates (see scripts/gen_crt_bundle.py for why).
+    static bool bundleInstalled = false;
+    if (!bundleInstalled) {
+      bundleInstalled = esp_crt_bundle_set(CRT_BUNDLE, sizeof(CRT_BUNDLE)) == ESP_OK;
+      if (!bundleInstalled) LOG_ERR("HTTP", "Custom CA bundle rejected, using default");
+    }
     esp_http_client_config_t config = {};
     config.url = currentUrl.c_str();
     config.event_handler = captureResponseHeaders;
