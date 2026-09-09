@@ -110,9 +110,7 @@ enum UIIcon {
   Wifi,
   Hotspot,
   Clock,
-  Wikipedia,
   Dice,
-  DuckDuckGo,
   Rss,
   Flashcards,
   Habits

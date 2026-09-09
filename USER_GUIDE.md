@@ -432,12 +432,11 @@ Teleport includes a robust suite of applications that extend the functionality o
 - **Flashcards**: Spaced-repetition study of a vocabulary deck (`/apps/flashcards/gre.deck`). Confirm shows the answer; Left/Right choose Again, Hard, Good or Easy and Confirm rates the card. On the overview screen Left/Right adjust how many new cards are introduced per day.
 - **Habits**: Daily check-ins. Up/Down select a habit, Confirm toggles today, Right adds a habit, Left opens details with streaks and a completion grid (Left again deletes the habit).
 - **Reddit**: Read your favorite subreddits. Connect to Wi-Fi to refresh the feed, and the text-heavy posts and comments are cached to your SD card for reading anytime offline.
-- **Wikipedia**: Search for topics and download complete, text-only Wikipedia articles to your SD card for offline reference.
 - **Dice & 8-Ball**: A handy utility for tabletop gamers. Roll D6, D20, spin arrows, or consult the Magic 8-Ball.
 - **RSS Feed**: Subscribe to your favorite blogs and news sites. Articles are downloaded and cached for distraction-free, offline reading using the native text reader engine.
 
 **Offline-First Paradigm**
-Apps like Reddit, Wikipedia, and RSS Feed are designed to be "offline-first". This means they will not immediately drain your battery by constantly connecting to Wi-Fi. You must manually press the **Refresh** button within these apps to connect and download the latest data. Once downloaded, the text is cached to your SD card, allowing you to disconnect from Wi-Fi and read the content seamlessly offline.
+Apps like Reddit and RSS Feed are designed to be "offline-first". This means they will not immediately drain your battery by constantly connecting to Wi-Fi. You must manually press the **Refresh** button within these apps to connect and download the latest data. Once downloaded, the text is cached to your SD card, allowing you to disconnect from Wi-Fi and read the content seamlessly offline.
 
 ---
 

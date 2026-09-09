@@ -14,13 +14,11 @@ Our goal is to make the device more useful in your day-to-day life without compr
 
 In addition to all the fantastic EPUB rendering, custom fonts, and library management features from the upstream CrossPoint project, **Teleport** includes a suite of applications and technical capabilities:
 
-- **Markdown & HTML Parser**: Features a custom parser and renderer that gracefully strips HTML tags and translates basic Markdown, allowing web content (like Wikipedia and Reddit) to be displayed elegantly in the native text reader engine.
+- **Markdown & HTML Parser**: Features a custom parser and renderer that gracefully strips HTML tags and translates basic Markdown, allowing web content (like RSS articles and Reddit) to be displayed elegantly in the native text reader engine.
 - **Flashcards**: Anki-style spaced repetition (SM-2) for a vocabulary deck stored on the SD card. Convert an `.apkg` export with `scripts/anki_to_deck.py` and copy the result to `/apps/flashcards/gre.deck`.
 - **Habits**: Daily habit check-ins with streaks and a 12-week completion grid. Fully offline; only needs the clock synced once.
-- **Wikipedia**: Search for topics and download complete, text-only Wikipedia articles to your SD card for offline reference.
 - **Dice & 8-Ball**: A handy utility for tabletop gamers. Roll D6, D20, spin arrows, flip coins, or consult the Magic 8-Ball.
 - **RSS Feed & Reddit**: Subscribe to your favorite blogs and news sites. Articles are downloaded and cached for distraction-free, offline reading using the native text reader engine.
-- **DuckDuckGo**: Search the web using DuckDuckGo. Results are displayed in a text-heavy format optimized for e-ink displays.
 
 
 ## Gallery

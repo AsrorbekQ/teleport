@@ -1,11 +1,9 @@
 #include "AppRegistry.h"
 
 #include "activities/dice/DiceActivity.h"
-#include "activities/duckduckgo/DuckDuckGoActivity.h"
 #include "activities/flashcards/FlashcardsActivity.h"
 #include "activities/habits/HabitsActivity.h"
 #include "activities/rss/RssActivity.h"
-#include "activities/wikipedia/WikipediaActivity.h"
 
 // System Activities
 #include "I18n.h"
@@ -64,16 +62,6 @@ AppRegistry::AppRegistry() {
   apps.push_back(std::make_unique<App>(
       []() { return tr(STR_HABITS); }, UIIcon::Habits,
       [](GfxRenderer& r, MappedInputManager& i) { return std::make_unique<HabitsActivity>(r, i); }));
-
-  // DuckDuckGo App
-  apps.push_back(std::make_unique<App>("DuckDuckGo", UIIcon::DuckDuckGo, [](GfxRenderer& r, MappedInputManager& i) {
-    return std::make_unique<DuckDuckGoActivity>(r, i);
-  }));
-
-  // Wikipedia App
-  apps.push_back(std::make_unique<App>("Wikipedia", UIIcon::Wikipedia, [](GfxRenderer& r, MappedInputManager& i) {
-    return std::make_unique<WikipediaActivity>(r, i);
-  }));
 
   // RSS Feed App
   apps.push_back(std::make_unique<App>("RSS Feed", UIIcon::Rss, [](GfxRenderer& r, MappedInputManager& i) {

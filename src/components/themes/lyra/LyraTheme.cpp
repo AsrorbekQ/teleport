@@ -19,8 +19,6 @@
 #include "components/icons/cover.h"
 #include "components/icons/dice.h"
 #include "components/icons/dice24.h"
-#include "components/icons/duckduckgo.h"
-#include "components/icons/duckduckgo24.h"
 #include "components/icons/file24.h"
 #include "components/icons/flashcards.h"
 #include "components/icons/flashcards24.h"
@@ -38,8 +36,6 @@
 #include "components/icons/text24.h"
 #include "components/icons/transfer.h"
 #include "components/icons/wifi.h"
-#include "components/icons/wikipedia.h"
-#include "components/icons/wikipedia24.h"
 #include "fontIds.h"
 
 // Internal constants
@@ -68,12 +64,8 @@ const uint8_t* iconForName(UIIcon icon, int size) {
         return File24Icon;
       case UIIcon::Clock:
         return Clock24Icon;
-      case UIIcon::Wikipedia:
-        return Wikipedia24Icon;
       case UIIcon::Dice:
         return Dice24Icon;
-      case UIIcon::DuckDuckGo:
-        return DuckDuckGo24Icon;
       case UIIcon::Rss:
         return Rss24Icon;
       case UIIcon::Flashcards:
@@ -103,12 +95,8 @@ const uint8_t* iconForName(UIIcon icon, int size) {
         return HotspotIcon;
       case UIIcon::Clock:
         return ClockIcon;
-      case UIIcon::Wikipedia:
-        return WikipediaIcon;
       case UIIcon::Dice:
         return DiceIcon;
-      case UIIcon::DuckDuckGo:
-        return DuckDuckGoIcon;
       case UIIcon::Rss:
         return RssIcon;
       case UIIcon::Flashcards:
