@@ -52,8 +52,8 @@ In addition to all the fantastic EPUB rendering, custom fonts, and library manag
 
 1. Clone this repository:
 ```bash
-git clone --recursive https://github.com/zakerytclarke/crosspoint-reader-apps.git
-cd crosspoint-reader-apps
+git clone --recursive https://github.com/AsrorbekQ/teleport.git
+cd teleport
 ```
 
 2. Install PlatformIO (if you haven't already).
