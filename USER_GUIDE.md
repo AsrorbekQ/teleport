@@ -431,7 +431,7 @@ Teleport includes a robust suite of applications that extend the functionality o
 
 - **Flashcards**: Spaced-repetition study of a vocabulary deck (`/apps/flashcards/gre.deck`). Confirm shows the answer; Left/Right choose Again, Hard, Good or Easy and Confirm rates the card. On the overview screen Left/Right adjust how many new cards are introduced per day.
 - **Habits**: Daily check-ins. Up/Down select a habit, Confirm toggles today, Right adds a habit, Left opens details with streaks and a completion grid (Left again deletes the habit).
-- **Read Later**: Links queued from Teleport Nest. Confirm fetches a page over Wi-Fi and opens it; Right fetches everything; Left removes a link. Pages are capped at 400 KB.
+- **Read Later**: Links queued from Nest. Confirm fetches a page over Wi-Fi and opens it; Right fetches everything; Left removes a link. Pages are capped at 400 KB.
 - **Briefing**: Date, weather, Todoist tasks, habit streaks and flashcards due. Confirm refreshes over Wi-Fi. With `enabled=1` in `/apps/briefing/config.txt` the same page is fetched when the device goes to sleep (at most every 6 hours, never below 20% battery) and stays on the screen overnight.
 - **Reddit**: Read your favorite subreddits. Connect to Wi-Fi to refresh the feed, and the text-heavy posts and comments are cached to your SD card for reading anytime offline.
 - **Dice & 8-Ball**: A handy utility for tabletop gamers. Roll D6, D20, spin arrows, or consult the Magic 8-Ball.
