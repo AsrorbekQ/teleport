@@ -176,7 +176,7 @@ void CrossPointWebServer::begin() {
   server->on("/api/wifi", HTTP_POST, [this] { handlePostWifiNetwork(); });
   server->on("/api/wifi/delete", HTTP_POST, [this] { handleDeleteWifiNetwork(); });
 
-  // Read Later queue (used by Teleport Hub)
+  // Read Later queue (used by Nest)
   server->on("/api/readlater", HTTP_GET, [this] { handleReadLaterGet(); });
   server->on("/api/readlater", HTTP_POST, [this] { handleReadLaterPost(); });
 
