@@ -15,7 +15,8 @@ commas; "a..b" marks every day from a to b inclusive. A habit with no dates is f
     Read 20 pages: 2026-09-05
     Meditate:
 
-Lines starting with # are ignored. Names may not contain ": ". Up to 12 habits, 31 chars each.
+Lines starting with # are ignored. The last colon on a line separates name from dates,
+so names may contain colons (e.g. "Slept by 24:00:"). Up to 12 habits, 31 chars each.
 The device keeps 400 days of history; older dates are dropped on import with a warning.
 """
 
@@ -98,7 +99,7 @@ def read_text(path: str):
                 continue
             if ":" not in line:
                 sys.exit(f"{path}:{line_no}: expected 'name: dates'")
-            name, _sep, dates = line.partition(":")
+            name, _sep, dates = line.rpartition(":")
             name = name.strip()
             if not name:
                 sys.exit(f"{path}:{line_no}: empty habit name")
