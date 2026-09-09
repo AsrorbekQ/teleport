@@ -1,25 +1,23 @@
-# CrossPoint Apps
+# Teleport
 
 
-**CrossPoint Apps** is a community-driven fork of the original [CrossPoint Reader](https://github.com/crosspoint-reader/crosspoint-reader) project. While the upstream project focuses solely on e-reading, this fork expands the capabilities of the Xteink X4 device by supporting a robust ecosystem of **apps and utilities**. 
+**Teleport** is a personal fork of [CrossPoint Apps](https://github.com/zakerytclarke/crosspoint-reader-apps), itself a community-driven fork of the original [CrossPoint Reader](https://github.com/crosspoint-reader/crosspoint-reader) project. While the upstream project focuses solely on e-reading, this fork expands the capabilities of the Xteink X4 device by supporting a robust ecosystem of **apps and utilities**. 
 
 Our goal is to make the device more useful in your day-to-day life without compromising its battery life, stability, or its core mission as an distraction-free e-ink reader.
 
 **Now running on:** ESP32C3-based Xteink [X4](https://www.xteink.com/products/xteink-x4) and [X3](https://www.xteink.com/products/xteink-x3).
 
 
-<img src="./docs/images/apps/homescreen.jpg" alt="Weather" width="50%">
+<img src="./docs/images/apps/homescreen.jpg" alt="Home screen" width="50%">
 
 ## Features
 
-In addition to all the fantastic EPUB rendering, custom fonts, and library management features from the upstream CrossPoint project, **CrossPoint Apps** includes a growing suite of applications and technical capabilities:
+In addition to all the fantastic EPUB rendering, custom fonts, and library management features from the upstream CrossPoint project, **Teleport** includes a suite of applications and technical capabilities:
 
 - **Markdown & HTML Parser**: Features a custom parser and renderer that gracefully strips HTML tags and translates basic Markdown, allowing web content (like Wikipedia and Reddit) to be displayed elegantly in the native text reader engine.
-- **Calculator**: A fully functional, e-ink optimized calculator for quick math.
-- **Weather**: View local forecasts. Fetches data when connected to Wi-Fi and caches it locally so you can check the weather even when offline.
-- **Sudoku**: Play randomly generated Sudoku puzzles. Fully playable offline.
+- **Flashcards**: Anki-style spaced repetition (SM-2) for a vocabulary deck stored on the SD card. Convert an `.apkg` export with `scripts/anki_to_deck.py` and copy the result to `/apps/flashcards/gre.deck`.
+- **Habits**: Daily habit check-ins with streaks and a 12-week completion grid. Fully offline; only needs the clock synced once.
 - **Wikipedia**: Search for topics and download complete, text-only Wikipedia articles to your SD card for offline reference.
-- **Chess**: A fully featured chess engine. Play against your friend.
 - **Dice & 8-Ball**: A handy utility for tabletop gamers. Roll D6, D20, spin arrows, flip coins, or consult the Magic 8-Ball.
 - **RSS Feed & Reddit**: Subscribe to your favorite blogs and news sites. Articles are downloaded and cached for distraction-free, offline reading using the native text reader engine.
 - **DuckDuckGo**: Search the web using DuckDuckGo. Results are displayed in a text-heavy format optimized for e-ink displays.
@@ -28,19 +26,13 @@ In addition to all the fantastic EPUB rendering, custom fonts, and library manag
 ## Gallery
 <table width="100%">
   <tr>
-    <td><img src="./docs/images/apps/weather.png" alt="Weather" width="100%"></td>
     <td><img src="./docs/images/apps/rss.png" alt="RSS" width="100%"></td>
     <td><img src="./docs/images/apps/reddit.png" alt="Reddit" width="100%"></td>
   </tr>
   <tr>
     <td><img src="./docs/images/apps/markdown.png" alt="Markdown" width="100%"></td>
     <td><img src="./docs/images/apps/html.png" alt="HTML" width="100%"></td>
-    <td><img src="./docs/images/apps/calculator.png" alt="Calculator" width="100%"></td>
-  </tr>
-  <tr>
-    <td><img src="./docs/images/apps/chess.png" alt="Chess" width="100%"></td>
     <td><img src="./docs/images/apps/dice.png" alt="Dice" width="100%"></td>
-    <td><img src="./docs/images/apps/sudoku.png" alt="Sudoku" width="100%"></td>
   </tr>
 </table>
 
@@ -87,4 +79,4 @@ See [CLAUDE.md](./CLAUDE.md) for detailed developer guidelines on how to build a
 
 ---
 
-CrossPoint Apps is a community fork and is **not affiliated with Xteink or any device manufacturer**.
+Teleport is a personal fork and is **not affiliated with Xteink or any device manufacturer**.

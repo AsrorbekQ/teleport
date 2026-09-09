@@ -1,8 +1,8 @@
-# CrossPoint Apps User Guide
+# Teleport User Guide
 
-Welcome to the **CrossPoint Apps** firmware. This guide outlines the hardware controls, navigation, reading features, and bundled applications of the device.
+Welcome to the **Teleport** firmware. This guide outlines the hardware controls, navigation, reading features, and bundled applications of the device.
 
-- [CrossPoint Apps User Guide](#crosspoint-apps-user-guide)
+- [Teleport User Guide](#teleport-user-guide)
   - [1. Hardware Overview](#1-hardware-overview)
     - [Button Layout](#button-layout)
   - [2. Power \& Startup](#2-power--startup)
@@ -427,14 +427,12 @@ See [docs/sd-card-fonts.md](./docs/sd-card-fonts.md) for full installation detai
 
 ### 3.9 Applications
 
-CrossPoint Apps includes a robust suite of applications that extend the functionality of the device. You can access these from the Home Screen or App Registry (depending on the theme).
+Teleport includes a robust suite of applications that extend the functionality of the device. You can access these from the Home Screen or App Registry (depending on the theme).
 
-- **Calculator**: A fully functional, e-ink optimized calculator for quick math.
-- **Weather**: View local forecasts. Connects to Wi-Fi to fetch data, which is then cached locally for offline viewing.
-- **Sudoku**: Play randomly generated Sudoku puzzles. Fully playable offline.
+- **Flashcards**: Spaced-repetition study of a vocabulary deck (`/apps/flashcards/gre.deck`). Confirm shows the answer; Left/Right choose Again, Hard, Good or Easy and Confirm rates the card. On the overview screen Left/Right adjust how many new cards are introduced per day.
+- **Habits**: Daily check-ins. Up/Down select a habit, Confirm toggles today, Right adds a habit, Left opens details with streaks and a completion grid (Left again deletes the habit).
 - **Reddit**: Read your favorite subreddits. Connect to Wi-Fi to refresh the feed, and the text-heavy posts and comments are cached to your SD card for reading anytime offline.
 - **Wikipedia**: Search for topics and download complete, text-only Wikipedia articles to your SD card for offline reference.
-- **Chess**: A fully featured chess engine. Play against the computer directly on your e-reader.
 - **Dice & 8-Ball**: A handy utility for tabletop gamers. Roll D6, D20, spin arrows, or consult the Magic 8-Ball.
 - **RSS Feed**: Subscribe to your favorite blogs and news sites. Articles are downloaded and cached for distraction-free, offline reading using the native text reader engine.
 

@@ -1,6 +1,6 @@
-# Project Vision & Scope: CrossPoint Apps
+# Project Vision & Scope: Teleport
 
-The goal of **CrossPoint Apps** is to create an efficient, open-source reading experience for the Xteink X4, augmented by a suite of high-quality, community-driven applications. We believe an e-reader can be a powerful, distraction-free companion device that goes beyond just reading books—provided the apps are designed with care for the e-ink display and battery life.
+The goal of **Teleport** is to create an efficient, open-source reading experience for the Xteink X4, augmented by a suite of high-quality, community-driven applications. We believe an e-reader can be a powerful, distraction-free companion device that goes beyond just reading books—provided the apps are designed with care for the e-ink display and battery life.
 
 ## 1. Core Mission
 
@@ -29,7 +29,7 @@ To provide a lightweight, high-performance firmware that maximizes the utility o
 
 ## 3. App Evaluation Guidelines
 
-We warmly welcome community contributions! If you want to build an app for CrossPoint Apps, ask yourself the following questions:
+We warmly welcome community contributions! If you want to build an app for Teleport, ask yourself the following questions:
 
 1. **Does it work offline?** (If it requires data, does it fetch it efficiently and cache it locally?)
 2. **Does it respect the E-ink display?** (Does it avoid animations and unnecessary full-screen refreshes?)
