@@ -6,12 +6,18 @@
 #include <base64.h>
 #include <esp_crt_bundle.h>
 #include <esp_http_client.h>
+#include <mbedtls/ssl.h>
+#include <mbedtls/x509_crt.h>
 
+#include <algorithm>
 #include <cstring>
 #include <functional>
 #include <string>
 
 #include "CrtBundle.generated.h"
+
+// IDF's bundle callback (non-static in esp_crt_bundle.c but not declared in its header).
+extern "C" int esp_crt_verify_callback(void* buf, mbedtls_x509_crt* crt, int depth, uint32_t* flags);
 #include "activities/RenderLock.h"
 
 namespace {
@@ -71,6 +77,67 @@ std::string resolveRedirectUrl(const std::string& base, const std::string& redir
   return base + "/" + redirect;
 }
 
+// --- TLS trust -------------------------------------------------------------
+// The IDF verify callback only ever checks a certificate's *issuer* against the
+// bundle, so a Let's Encrypt chain (leaf <- YR1 <- Root YR <- ISRG Root X1) still
+// ends in an RSA-4096 signature check that runs out of memory at the handshake
+// peak on the ESP32-C3. This wrapper first asks whether the certificate itself
+// (subject + public key) is in our bundle; if so it is a trust anchor and no
+// further signature work is needed. Everything else falls through to IDF.
+bool bundleContains(const uint8_t* subject, size_t subjectLen, const uint8_t* key, size_t keyLen) {
+  uint32_t firstOffset = 0;
+  memcpy(&firstOffset, CRT_BUNDLE, sizeof(firstOffset));
+  const uint32_t count = firstOffset / sizeof(uint32_t);
+  uint32_t lo = 0;
+  uint32_t hi = count;
+  while (lo < hi) {
+    const uint32_t mid = lo + (hi - lo) / 2;
+    uint32_t offset = 0;
+    memcpy(&offset, CRT_BUNDLE + mid * sizeof(uint32_t), sizeof(offset));
+    uint16_t nameLen = 0;
+    uint16_t keyLen2 = 0;
+    memcpy(&nameLen, CRT_BUNDLE + offset, sizeof(nameLen));
+    memcpy(&keyLen2, CRT_BUNDLE + offset + 2, sizeof(keyLen2));
+    const uint8_t* name = CRT_BUNDLE + offset + 4;
+    const size_t common = std::min<size_t>(nameLen, subjectLen);
+    int cmp = memcmp(name, subject, common);
+    if (cmp == 0) cmp = (nameLen < subjectLen) ? -1 : (nameLen > subjectLen ? 1 : 0);
+    if (cmp == 0) {
+      return keyLen2 == keyLen && memcmp(name + nameLen, key, keyLen) == 0;
+    }
+    if (cmp < 0) {
+      lo = mid + 1;
+    } else {
+      hi = mid;
+    }
+  }
+  return false;
+}
+
+int verifyWithAnchors(void* buf, mbedtls_x509_crt* crt, int depth, uint32_t* flags) {
+  const uint32_t filtered = *flags & ~static_cast<uint32_t>(MBEDTLS_X509_BADCERT_BAD_MD);
+  if (filtered == MBEDTLS_X509_BADCERT_NOT_TRUSTED &&
+      bundleContains(crt->subject_raw.p, crt->subject_raw.len, crt->pk_raw.p, crt->pk_raw.len)) {
+    LOG_DBG("HTTP", "TLS: trust anchor matched at depth %d", depth);
+    *flags = 0;
+    return 0;
+  }
+  return esp_crt_verify_callback(buf, crt, depth, flags);
+}
+
+esp_err_t attachTrustBundle(void* conf) {
+  static bool bundleInstalled = false;
+  if (!bundleInstalled) {
+    bundleInstalled = esp_crt_bundle_set(CRT_BUNDLE, sizeof(CRT_BUNDLE)) == ESP_OK;
+    if (!bundleInstalled) LOG_ERR("HTTP", "Custom CA bundle rejected, using default");
+  }
+  const esp_err_t err = esp_crt_bundle_attach(conf);
+  if (err == ESP_OK) {
+    mbedtls_ssl_conf_verify(static_cast<mbedtls_ssl_config*>(conf), verifyWithAnchors, nullptr);
+  }
+  return err;
+}
+
 // esp_http_client_get_header() only reads *request* headers, so the redirect
 // target must be captured from the response header event instead.
 struct ResponseCapture {
@@ -103,12 +170,6 @@ HttpDownloader::DownloadError runGet(const std::string& url, const std::string& 
 
   while (hop < 10) {
     ResponseCapture capture;
-    // Roots plus common intermediates (see scripts/gen_crt_bundle.py for why).
-    static bool bundleInstalled = false;
-    if (!bundleInstalled) {
-      bundleInstalled = esp_crt_bundle_set(CRT_BUNDLE, sizeof(CRT_BUNDLE)) == ESP_OK;
-      if (!bundleInstalled) LOG_ERR("HTTP", "Custom CA bundle rejected, using default");
-    }
     esp_http_client_config_t config = {};
     config.url = currentUrl.c_str();
     config.event_handler = captureResponseHeaders;
@@ -116,8 +177,8 @@ HttpDownloader::DownloadError runGet(const std::string& url, const std::string& 
     config.buffer_size = HTTP_RX_BUF;
     config.buffer_size_tx = HTTP_TX_BUF;
     config.timeout_ms = HTTP_TIMEOUT_MS;
-    // Verify HTTPS against the bundled CA roots.
-    config.crt_bundle_attach = esp_crt_bundle_attach;
+    // Verify HTTPS against our bundle (roots + intermediates as trust anchors).
+    config.crt_bundle_attach = attachTrustBundle;  // roots + intermediates as trust anchors, see above
     config.keep_alive_enable = true;
     // The device never gets a routable IPv6 address; resolving AAAA first can stall connects.
     config.addr_type = HTTP_ADDR_TYPE_INET;
