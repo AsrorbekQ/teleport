@@ -23,6 +23,26 @@ AppRegistry& AppRegistry::getInstance() {
 }
 
 AppRegistry::AppRegistry() {
+  // Flashcards App
+  apps.push_back(std::make_unique<App>(
+      []() { return tr(STR_FLASHCARDS); }, UIIcon::Flashcards,
+      [](GfxRenderer& r, MappedInputManager& i) { return std::make_unique<FlashcardsActivity>(r, i); }));
+
+  // Habits App
+  apps.push_back(std::make_unique<App>(
+      []() { return tr(STR_HABITS); }, UIIcon::Habits,
+      [](GfxRenderer& r, MappedInputManager& i) { return std::make_unique<HabitsActivity>(r, i); }));
+
+  // Briefing App
+  apps.push_back(std::make_unique<App>(
+      []() { return tr(STR_BRIEFING); }, UIIcon::Dashboard,
+      [](GfxRenderer& r, MappedInputManager& i) { return std::make_unique<BriefingActivity>(r, i); }));
+
+  // Settings
+  apps.push_back(std::make_unique<App>(
+      []() { return tr(STR_SETTINGS_TITLE); }, UIIcon::Settings,
+      [](GfxRenderer& r, MappedInputManager& i) { return std::make_unique<SettingsActivity>(r, i); }));
+
   // Browse Files
   apps.push_back(std::make_unique<App>(
       []() { return tr(STR_BROWSE_FILES); }, UIIcon::Folder,
@@ -45,35 +65,10 @@ AppRegistry::AppRegistry() {
                                        },
                                        []() { return OPDS_STORE.hasServers(); }));
 
-  // File Transfer
-  apps.push_back(std::make_unique<App>(
-      []() { return tr(STR_FILE_TRANSFER); }, UIIcon::Transfer,
-      [](GfxRenderer& r, MappedInputManager& i) { return std::make_unique<CrossPointWebServerActivity>(r, i); }));
-
-  // Settings
-  apps.push_back(std::make_unique<App>(
-      []() { return tr(STR_SETTINGS_TITLE); }, UIIcon::Settings,
-      [](GfxRenderer& r, MappedInputManager& i) { return std::make_unique<SettingsActivity>(r, i); }));
-
-  // Flashcards App
-  apps.push_back(std::make_unique<App>(
-      []() { return tr(STR_FLASHCARDS); }, UIIcon::Flashcards,
-      [](GfxRenderer& r, MappedInputManager& i) { return std::make_unique<FlashcardsActivity>(r, i); }));
-
-  // Habits App
-  apps.push_back(std::make_unique<App>(
-      []() { return tr(STR_HABITS); }, UIIcon::Habits,
-      [](GfxRenderer& r, MappedInputManager& i) { return std::make_unique<HabitsActivity>(r, i); }));
-
   // Read Later App
   apps.push_back(std::make_unique<App>(
       []() { return tr(STR_READ_LATER); }, UIIcon::ReadLater,
       [](GfxRenderer& r, MappedInputManager& i) { return std::make_unique<ReadLaterActivity>(r, i); }));
-
-  // Briefing App
-  apps.push_back(std::make_unique<App>(
-      []() { return tr(STR_BRIEFING); }, UIIcon::Dashboard,
-      [](GfxRenderer& r, MappedInputManager& i) { return std::make_unique<BriefingActivity>(r, i); }));
 
   // RSS Feed App
   apps.push_back(std::make_unique<App>("RSS Feed", UIIcon::Rss, [](GfxRenderer& r, MappedInputManager& i) {
@@ -84,4 +79,9 @@ AppRegistry::AppRegistry() {
   apps.push_back(std::make_unique<App>("Dice", UIIcon::Dice, [](GfxRenderer& r, MappedInputManager& i) {
     return std::make_unique<DiceActivity>(r, i);
   }));
+
+  // File Transfer
+  apps.push_back(std::make_unique<App>(
+      []() { return tr(STR_FILE_TRANSFER); }, UIIcon::Transfer,
+      [](GfxRenderer& r, MappedInputManager& i) { return std::make_unique<CrossPointWebServerActivity>(r, i); }));
 }

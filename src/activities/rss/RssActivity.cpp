@@ -3,6 +3,7 @@
 #include "activities/ActivityManager.h"
 #include "activities/network/WifiSelectionActivity.h"
 #include "activities/reader/ReaderActivity.h"
+#include "activities/readlater/ReadLaterStore.h"
 #include "activities/util/ConfirmationActivity.h"
 #include "activities/util/DownloadWatchdog.h"
 #include "activities/util/KeyboardEntryActivity.h"
@@ -715,6 +716,8 @@ std::string timeAgo(uint32_t timestamp) {
   return std::to_string(diff / 86400) + "d ago";
 }
 
+constexpr size_t MAX_FEED_BYTES = 512 * 1024;
+
 static void rssFetchTaskFunc(void *param) {
   RssActivity *activity = static_cast<RssActivity *>(param);
   activity->runBackgroundFetch();
@@ -934,9 +937,12 @@ void RssActivity::runBackgroundFetch() {
 
       while (fetchRetries > 0 && !cancelFetch) {
         std::string errorDetail;
+        // Substack-style feeds embed every full post and run past 1 MB; the list only
+        // needs the newest items, so cut the body and let the parser stop at the cut.
         auto res = HttpDownloader::downloadToFile(url, xmlPath, nullptr,
                                                   &cancelFetch, "", "", nullptr,
-                                                  nullptr, &errorDetail);
+                                                  nullptr, &errorDetail,
+                                                  MAX_FEED_BYTES);
         if (res == HttpDownloader::OK) {
           fetchSuccess = true;
           break;
@@ -1143,6 +1149,23 @@ void RssActivity::onExit() {
   if (wifiWasUsed) {
     silentRestart();
   }
+}
+
+// Queues the open post for the Read Later app; the page itself is fetched from there.
+void RssActivity::sendToReadLater() {
+  if (selectedItemIndex < 0 || selectedItemIndex >= static_cast<int>(allItems.size())) return;
+  const auto &item = allItems[selectedItemIndex];
+  const char *message = tr(STR_RSS_NO_LINK);
+  if (!item.link.empty()) {
+    message = ReadLaterStore::appendUrl(item.link, item.title) ? tr(STR_RSS_SAVED_READ_LATER) : tr(STR_RL_FETCH_FAILED);
+  }
+  {
+    RenderLock lock;
+    GUI.drawPopup(renderer, message);
+    renderer.displayBuffer();
+  }
+  delay(1200);
+  requestUpdate();
 }
 
 void RssActivity::saveDiagnosticLog() {
@@ -1423,6 +1446,8 @@ void RssActivity::loop() {
   } else if (state == RssState::PostDetail) {
     if (mappedInput.wasReleased(MappedInputManager::Button::Left)) {
       saveDiagnosticLog();
+    } else if (mappedInput.wasReleased(MappedInputManager::Button::Right)) {
+      sendToReadLater();
     } else if (mappedInput.wasReleased(MappedInputManager::Button::Up)) {
       if (detailScrollOffset > 0) {
         detailScrollOffset--;
@@ -1609,7 +1634,7 @@ void RssActivity::render(RenderLock &&) {
     }
 
     const auto labels =
-        mappedInput.mapLabels(tr(STR_BACK), "Visit Link", tr(STR_SAVE_LOG), nullptr);
+        mappedInput.mapLabels(tr(STR_BACK), "Visit Link", tr(STR_SAVE_LOG), tr(STR_READ_LATER));
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3,
                         labels.btn4);
   } else if (state == RssState::FeedSelection) {

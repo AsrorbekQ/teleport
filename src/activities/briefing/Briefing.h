@@ -6,7 +6,8 @@
 #include <string>
 #include <vector>
 
-// Morning briefing: weather (Open-Meteo), today's Todoist tasks, habit streaks and
+// Morning briefing: weather (Open-Meteo), today's tasks (Apple Reminders and
+// Calendar, served as plain text by Nest on the local network), habit streaks and
 // flashcards due. Data is fetched over Wi-Fi at sleep time (when enabled) or on
 // demand, cached on the SD card, and rendered as a static full-screen page.
 namespace Briefing {
@@ -24,8 +25,7 @@ struct Config {
   float lat = 0;
   float lon = 0;
   std::string city;
-  std::string todoistToken;
-  std::string todoistUrl;  // optional override of the tasks endpoint
+  std::string tasksUrl;  // plain text, one task per line; "! " prefix marks overdue
 };
 
 struct Data {

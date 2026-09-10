@@ -18,7 +18,7 @@ In addition to all the fantastic EPUB rendering, custom fonts, and library manag
 - **Flashcards**: Anki-style spaced repetition (SM-2) for a vocabulary deck stored on the SD card. Convert an `.apkg` export with `scripts/anki_to_deck.py` and copy the result to `/apps/flashcards/gre.deck`.
 - **Habits**: Daily habit check-ins with streaks and a 12-week completion grid. Fully offline; only needs the clock synced once.
 - **Read Later**: Queue web pages from [Nest](https://github.com/AsrorbekQ/teleport-nest) (or `POST /api/readlater`); the device fetches and caches them for offline reading.
-- **Briefing**: A morning dashboard with the date, weather (Open-Meteo), today's Todoist tasks, habit streaks and flashcards due. Optionally fetched at sleep time and left on the e-ink screen overnight. Configure it from Nest.
+- **Briefing**: A morning dashboard with the date, weather (Open-Meteo), today's tasks from Apple Reminders and Calendar (via Nest), habit streaks and flashcards due. Optionally fetched at sleep time and left on the e-ink screen overnight. Configure it from Nest.
 - **Dice & 8-Ball**: A handy utility for tabletop gamers. Roll D6, D20, spin arrows, flip coins, or consult the Magic 8-Ball.
 - **RSS Feed & Reddit**: Subscribe to your favorite blogs and news sites. Articles are downloaded and cached for distraction-free, offline reading using the native text reader engine.
 

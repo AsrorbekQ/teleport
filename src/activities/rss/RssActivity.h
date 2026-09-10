@@ -49,6 +49,7 @@ class RssActivity final : public Activity {
  public:
   void runBackgroundFetch();
   void saveDiagnosticLog();
+  void sendToReadLater();
   explicit RssActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
       : Activity("RssFeed", renderer, mappedInput) {}
 

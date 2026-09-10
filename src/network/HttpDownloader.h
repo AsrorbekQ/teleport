@@ -44,11 +44,13 @@ class HttpDownloader {
   static bool fetchUrlBearer(const std::string& url, const std::string& bearerToken, const DataCallback& onData);
 
   /**
-   * Download a file to the SD card with optional credentials.
+   * Download a file to the SD card with optional credentials. When maxBytes is
+   * non-zero the body is cut there and the download still counts as OK (for
+   * feeds whose useful part is at the top).
    */
   static DownloadError downloadToFile(const std::string& url, const std::string& destPath,
                                       ProgressCallback progress = nullptr, bool* cancelFlag = nullptr,
                                       const std::string& username = "", const std::string& password = "",
                                       std::string* outContentType = nullptr, std::string* outFinalUrl = nullptr,
-                                      std::string* outErrorDetail = nullptr);
+                                      std::string* outErrorDetail = nullptr, size_t maxBytes = 0);
 };

@@ -23,7 +23,7 @@ class FlashcardsActivity final : public Activity {
   static constexpr const char* PROGRESS_PATH = "/apps/flashcards/gre.prog";
 
  private:
-  enum class Screen : uint8_t { NoClock, NoDeck, Overview, Question, Answer, Done };
+  enum class Screen : uint8_t { NoDeck, Overview, Question, Answer, Done };
 
   static constexpr uint8_t RATINGS_PER_SAVE = 10;
   static constexpr uint8_t NEW_PER_DAY_STEP = 5;
@@ -41,7 +41,6 @@ class FlashcardsActivity final : public Activity {
   void showNextCard();
   void commitRating();
   void persist();
-  void syncClock();
 
   void renderOverview();
   void renderQuestion();
@@ -50,6 +49,7 @@ class FlashcardsActivity final : public Activity {
   void renderMessage(const char* title, const char* hint);
   void renderStageSubtitle(char* buf, size_t bufSize) const;
   void renderCounters(int y);
+  void renderNextDueHint(int y);
   int drawParagraph(int fontId, EpdFontFamily::Style style, int x, int y, int width, int bottomLimit, const char* text);
   static void formatInterval(char* buf, size_t bufSize, uint32_t seconds);
 };

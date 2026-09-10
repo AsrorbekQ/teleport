@@ -1,5 +1,6 @@
 #include "FlashcardScheduler.h"
 
+#include <Arduino.h>
 #include <HalStorage.h>
 #include <Logging.h>
 #include <Memory.h>
@@ -34,24 +35,77 @@ bool FlashcardScheduler::init(uint16_t cardCount, const char* progressPath) {
 
   HalFile file;
   if (Storage.openFileForRead(TAG, path, file)) {
+    // Version 1 stored wall-clock time; its header is the first 16 bytes of the current layout.
+    struct HeaderV1 {
+      char magic[4];
+      uint8_t version;
+      uint8_t newPerDay;
+      uint16_t cardCount;
+      uint32_t lastStudyDay;
+      uint16_t newToday;
+      uint16_t reviewedToday;
+    };
+    static_assert(sizeof(HeaderV1) == 16 && sizeof(Header) == 20, "progress header layout");
     Header header{};
     const size_t stateBytes = static_cast<size_t>(count) * sizeof(CardState);
-    if (file.read(&header, sizeof(header)) == static_cast<int>(sizeof(header)) &&
-        memcmp(header.magic, "CPFP", 4) == 0 && header.version == FILE_VERSION && header.cardCount == count &&
-        file.read(states.get(), stateBytes) == static_cast<int>(stateBytes)) {
-      lastStudyDay = header.lastStudyDay;
+    bool loaded = false;
+    if (file.read(&header, sizeof(HeaderV1)) == static_cast<int>(sizeof(HeaderV1)) &&
+        memcmp(header.magic, "CPFP", 4) == 0 && header.cardCount == count) {
+      if (header.version == FILE_VERSION) {
+        loaded =
+            file.read(&header.dayElapsed, sizeof(header.dayElapsed)) == static_cast<int>(sizeof(header.dayElapsed)) &&
+            file.read(states.get(), stateBytes) == static_cast<int>(stateBytes);
+        if (loaded) {
+          studyDay = std::max<uint32_t>(header.studyDay, 1);
+          dayElapsed = header.dayElapsed;
+        }
+      } else if (header.version == 1) {
+        loaded = file.read(states.get(), stateBytes) == static_cast<int>(stateBytes);
+        if (loaded) migrateFromWallClock(header.studyDay);
+      }
+    }
+    if (loaded) {
       newTodayCount = header.newToday;
       reviewedTodayCount = header.reviewedToday;
       newPerDayLimit = std::clamp(header.newPerDay, MIN_NEW_PER_DAY, MAX_NEW_PER_DAY);
-      LOG_INF(TAG, "Loaded progress for %u cards", count);
+      LOG_INF(TAG, "Loaded progress for %u cards, day %lu", count, static_cast<unsigned long>(studyDay));
     } else {
       LOG_ERR(TAG, "Progress file mismatch, starting fresh");
       for (uint16_t i = 0; i < count; i++) states[i] = CardState{};
+      studyDay = 1;
+      dayElapsed = 0;
     }
   }
+  sessionStartMs = millis();
   isDirty = false;
-  rollDayIfNeeded();
   return true;
+}
+
+// v1 due times were UTC seconds. Review cards keep their day distance from the last
+// study day; learning cards become due immediately. Day 1 is the migration day.
+void FlashcardScheduler::migrateFromWallClock(uint32_t lastStudyDay) {
+  studyDay = 1;
+  dayElapsed = 0;
+  for (uint16_t i = 0; i < count; i++) {
+    CardState& s = states[i];
+    switch (static_cast<Stage>(s.stage)) {
+      case Stage::New:
+        s.due = 0;
+        break;
+      case Stage::Review: {
+        const uint32_t dueDay =
+            static_cast<uint32_t>((static_cast<int64_t>(s.due) + DateUtils::utcOffsetSeconds()) / SECONDS_PER_DAY);
+        const uint32_t ahead = dueDay > lastStudyDay ? dueDay - lastStudyDay : 0;
+        s.due = (studyDay + ahead) * SECONDS_PER_DAY;
+        break;
+      }
+      case Stage::Learning:
+      case Stage::Relearning:
+        s.due = studyDay * SECONDS_PER_DAY;
+        break;
+    }
+  }
+  isDirty = true;
 }
 
 bool FlashcardScheduler::save() {
@@ -66,9 +120,11 @@ bool FlashcardScheduler::save() {
   header.version = FILE_VERSION;
   header.newPerDay = newPerDayLimit;
   header.cardCount = count;
-  header.lastStudyDay = lastStudyDay;
+  foldSessionTime();
+  header.studyDay = studyDay;
   header.newToday = newTodayCount;
   header.reviewedToday = reviewedTodayCount;
+  header.dayElapsed = dayElapsed;
   const size_t stateBytes = static_cast<size_t>(count) * sizeof(CardState);
   if (file.write(&header, sizeof(header)) != sizeof(header) || file.write(states.get(), stateBytes) != stateBytes) {
     LOG_ERR(TAG, "Short write to %s", path);
@@ -83,14 +139,33 @@ void FlashcardScheduler::release() {
   count = 0;
 }
 
-void FlashcardScheduler::rollDayIfNeeded() {
-  const uint32_t today = DateUtils::todayIndex();
-  if (today != lastStudyDay) {
-    lastStudyDay = today;
-    newTodayCount = 0;
-    reviewedTodayCount = 0;
-    isDirty = true;
-  }
+uint32_t FlashcardScheduler::now() const {
+  return studyDay * SECONDS_PER_DAY + dayElapsed + (millis() - sessionStartMs) / 1000;
+}
+
+void FlashcardScheduler::foldSessionTime() {
+  const uint32_t nowMs = millis();
+  dayElapsed += (nowMs - sessionStartMs) / 1000;
+  sessionStartMs = nowMs;
+}
+
+void FlashcardScheduler::resetDayCounters() {
+  dayElapsed = 0;
+  sessionStartMs = millis();
+  newTodayCount = 0;
+  reviewedTodayCount = 0;
+  isDirty = true;
+}
+
+void FlashcardScheduler::advanceDay() {
+  studyDay++;
+  resetDayCounters();
+}
+
+void FlashcardScheduler::rewindDay() {
+  if (studyDay <= 1) return;
+  studyDay--;
+  resetDayCounters();
 }
 
 uint32_t FlashcardScheduler::learningStepSeconds(uint8_t step) {
@@ -122,7 +197,7 @@ void FlashcardScheduler::applyRating(CardState& s, Rating rating, uint32_t now, 
     s.stage = static_cast<uint8_t>(Stage::Review);
     s.step = 0;
     s.interval = static_cast<uint16_t>(std::min(days, MAX_INTERVAL));
-    s.due = DateUtils::startOfLocalDayUtc(today + s.interval);
+    s.due = (today + s.interval) * SECONDS_PER_DAY;
   };
 
   switch (static_cast<Stage>(s.stage)) {
@@ -188,29 +263,27 @@ void FlashcardScheduler::applyRating(CardState& s, Rating rating, uint32_t now, 
 
 void FlashcardScheduler::rate(uint16_t index, Rating rating) {
   if (!states || index >= count) return;
-  rollDayIfNeeded();
   CardState& s = states[index];
   if (static_cast<Stage>(s.stage) == Stage::New) newTodayCount++;
   reviewedTodayCount++;
-  applyRating(s, rating, DateUtils::nowUtc(), DateUtils::todayIndex());
+  applyRating(s, rating, now(), studyDay);
   isDirty = true;
 }
 
 uint32_t FlashcardScheduler::previewIntervalSeconds(uint16_t index, Rating rating) const {
   if (!states || index >= count) return 0;
   CardState copy = states[index];
-  const uint32_t now = DateUtils::nowUtc();
-  applyRating(copy, rating, now, DateUtils::todayIndex());
+  const uint32_t current = now();
+  applyRating(copy, rating, current, studyDay);
   if (static_cast<Stage>(copy.stage) == Stage::Review) {
-    return static_cast<uint32_t>(copy.interval) * DateUtils::SECONDS_PER_DAY;
+    return static_cast<uint32_t>(copy.interval) * SECONDS_PER_DAY;
   }
-  return copy.due > now ? copy.due - now : 0;
+  return copy.due > current ? copy.due - current : 0;
 }
 
 uint16_t FlashcardScheduler::nextCard() {
   if (!states) return INVALID_INDEX;
-  rollDayIfNeeded();
-  const uint32_t now = DateUtils::nowUtc();
+  const uint32_t now = this->now();
 
   uint16_t bestLearning = INVALID_INDEX;
   uint16_t bestReview = INVALID_INDEX;
@@ -245,7 +318,7 @@ uint16_t FlashcardScheduler::nextCard() {
 FlashcardScheduler::Counts FlashcardScheduler::counts() const {
   Counts c;
   if (!states) return c;
-  const uint32_t now = DateUtils::nowUtc();
+  const uint32_t now = this->now();
   uint16_t newCards = 0;
   for (uint16_t i = 0; i < count; i++) {
     const CardState& s = states[i];
@@ -270,7 +343,7 @@ FlashcardScheduler::Counts FlashcardScheduler::counts() const {
 
 uint32_t FlashcardScheduler::secondsUntilNextDue() const {
   if (!states) return UINT32_MAX;
-  const uint32_t now = DateUtils::nowUtc();
+  const uint32_t now = this->now();
   uint32_t best = UINT32_MAX;
   for (uint16_t i = 0; i < count; i++) {
     const CardState& s = states[i];

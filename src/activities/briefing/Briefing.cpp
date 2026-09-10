@@ -24,9 +24,8 @@
 namespace Briefing {
 namespace {
 constexpr const char* TAG = "BRIEF";
-constexpr size_t MAX_TASK_BODY = 24 * 1024;  // enough for ~40 tasks; the rest is cut off
+constexpr size_t MAX_TASK_BODY = 4 * 1024;  // Nest sends at most a screenful of lines
 constexpr size_t MAX_TASK_TEXT = 90;
-constexpr const char* DEFAULT_TODOIST_URL = "https://api.todoist.com/api/v1/tasks/filter?query=today%20%7C%20overdue";
 constexpr int SIDE_PADDING = 24;
 
 void trim(std::string& s) {
@@ -103,44 +102,30 @@ bool fetchWeather(const Config& config, Data& data) {
   return true;
 }
 
+// Nest answers with one task per line, calendar events first ("09:30 Standup"),
+// then reminders; overdue reminders carry a "! " prefix. Blank and "#" lines are skipped.
 bool fetchTasks(const Config& config, Data& data) {
-  const std::string& url = config.todoistUrl.empty() ? DEFAULT_TODOIST_URL : config.todoistUrl;
   std::string body;
-  body.reserve(4096);
-  const bool ok = HttpDownloader::fetchUrlBearer(url, config.todoistToken, [&body](const uint8_t* chunk, size_t len) {
+  body.reserve(1024);
+  const bool ok = HttpDownloader::fetchUrl(config.tasksUrl, [&body](const uint8_t* chunk, size_t len) {
     if (body.size() >= MAX_TASK_BODY) return false;
     body.append(reinterpret_cast<const char*>(chunk), std::min(len, MAX_TASK_BODY - body.size()));
     return true;
   });
   if (!ok && body.empty()) return false;
 
-  // Accept both the unified API shape {"results":[...]} and the older REST v2 bare array.
-  JsonDocument filter;
-  filter[0]["content"] = true;
-  filter[0]["due"]["date"] = true;
-  filter["results"][0]["content"] = true;
-  filter["results"][0]["due"]["date"] = true;
-  JsonDocument doc;
-  const auto err = deserializeJson(doc, body, DeserializationOption::Filter(filter));
-  if (err != DeserializationError::Ok && err != DeserializationError::IncompleteInput) {
-    LOG_ERR(TAG, "Tasks JSON invalid: %s", err.c_str());
-    return false;
-  }
-  JsonArray tasks = doc.is<JsonArray>() ? doc.as<JsonArray>() : doc["results"].as<JsonArray>();
-
-  char today[12];
-  DateUtils::formatDay(today, sizeof(today), DateUtils::todayIndex());
   data.tasks.clear();
   data.tasks.reserve(MAX_TASKS);
-  for (JsonObject task : tasks) {
-    if (data.tasks.size() >= MAX_TASKS) break;
-    const char* content = task["content"] | "";
-    if (!*content) continue;
-    const char* due = task["due"]["date"] | "";
-    std::string text = (*due && strncmp(due, today, 10) < 0) ? "! " : "";
-    text += content;
-    if (text.size() > MAX_TASK_TEXT) text.resize(MAX_TASK_TEXT);
-    data.tasks.push_back(std::move(text));
+  size_t pos = 0;
+  while (pos < body.size() && data.tasks.size() < MAX_TASKS) {
+    size_t eol = body.find('\n', pos);
+    if (eol == std::string::npos) eol = body.size();
+    std::string line = body.substr(pos, eol - pos);
+    pos = eol + 1;
+    trim(line);
+    if (line.empty() || line[0] == '#') continue;
+    if (line.size() > MAX_TASK_TEXT) line.resize(MAX_TASK_TEXT);
+    data.tasks.push_back(std::move(line));
   }
   data.hasTasks = true;
   return true;
@@ -171,10 +156,8 @@ Config loadConfig() {
   readKeyValues(CONFIG_PATH, [&config](const std::string& key, const std::string& value) {
     if (key == "enabled")
       config.enabled = value == "1" || value == "true";
-    else if (key == "todoist_token")
-      config.todoistToken = value;
-    else if (key == "todoist_url")
-      config.todoistUrl = value;
+    else if (key == "tasks_url")
+      config.tasksUrl = value;
     else if (key == "city")
       config.city = value;
     else if (key == "lat")
@@ -250,14 +233,14 @@ bool refresh(const Config& config, Data& data, std::string& error) {
       error = tr(STR_BF_WEATHER_UNAVAILABLE);
     }
   }
-  if (!config.todoistToken.empty()) {
+  if (!config.tasksUrl.empty()) {
     if (fetchTasks(config, data)) {
       any = true;
     } else {
       error = tr(STR_BF_TASKS_UNAVAILABLE);
     }
   }
-  if (any || (!config.hasLocation && config.todoistToken.empty())) {
+  if (any || (!config.hasLocation && config.tasksUrl.empty())) {
     data.fetchedAt = DateUtils::nowUtc();
     any = true;
   }
@@ -266,7 +249,7 @@ bool refresh(const Config& config, Data& data, std::string& error) {
 
 bool shouldRefreshAtSleep(const Config& config, const Data& data) {
   if (!config.enabled) return false;
-  if (!config.hasLocation && config.todoistToken.empty()) return false;
+  if (!config.hasLocation && config.tasksUrl.empty()) return false;
   if (powerManager.getBatteryPercentage() < MIN_BATTERY_FOR_FETCH) return false;
   if (!DateUtils::hasValidTime()) return true;
   const uint32_t now = DateUtils::nowUtc();
@@ -318,7 +301,7 @@ void render(GfxRenderer& renderer, const Config& config, const Data& data, int b
   }
 
   // Tasks
-  if (!config.todoistToken.empty()) {
+  if (!config.tasksUrl.empty()) {
     y = drawSectionTitle(renderer, y, width, tr(STR_BF_TODAY));
     if (!data.hasTasks) {
       y = drawRow(renderer, UI_10_FONT_ID, y, width, tr(STR_BF_TASKS_UNAVAILABLE), nullptr);

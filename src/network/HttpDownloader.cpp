@@ -15,6 +15,7 @@
 #include <string>
 
 #include "CrtBundle.generated.h"
+#include "activities/util/DownloadWatchdog.h"
 
 // IDF's bundle callback (non-static in esp_crt_bundle.c but not declared in its header).
 extern "C" int esp_crt_verify_callback(void* buf, mbedtls_x509_crt* crt, int depth, uint32_t* flags);
@@ -41,6 +42,7 @@ struct Sink {
   bool* cancelFlag = nullptr;
   size_t total = 0;
   size_t downloaded = 0;
+  size_t maxBytes = 0;  // 0 = unlimited; otherwise stop after this many bytes and report OK
 };
 
 bool isRedirect(int status) {
@@ -290,7 +292,13 @@ HttpDownloader::DownloadError runGet(const std::string& url, const std::string& 
       return HttpDownloader::FILE_ERROR;
     }
     sink.downloaded += read;
+    DownloadWatchdog::kick();  // progress, not elapsed time, is what the RSS watchdog guards
     if (sink.progress && sink.total > 0) sink.progress(sink.downloaded, sink.total);
+    if (sink.maxBytes > 0 && sink.downloaded >= sink.maxBytes) {
+      LOG_INF("HTTP", "cut at %zu bytes (cap %zu)", sink.downloaded, sink.maxBytes);
+      esp_http_client_cleanup(client);
+      return HttpDownloader::OK;
+    }
   }
 
   const bool complete = esp_http_client_is_complete_data_received(client);
@@ -344,7 +352,7 @@ HttpDownloader::DownloadError HttpDownloader::downloadToFile(const std::string& 
                                                              ProgressCallback progress, bool* cancelFlag,
                                                              const std::string& username, const std::string& password,
                                                              std::string* outContentType, std::string* outFinalUrl,
-                                                             std::string* outErrorDetail) {
+                                                             std::string* outErrorDetail, size_t maxBytes) {
   LOG_DBG("HTTP", "Downloading: %s -> %s", url.c_str(), destPath.c_str());
 
   {
@@ -365,6 +373,7 @@ HttpDownloader::DownloadError HttpDownloader::downloadToFile(const std::string& 
   Sink sink;
   sink.progress = std::move(progress);
   sink.cancelFlag = cancelFlag;
+  sink.maxBytes = maxBytes;
   sink.write = [&file](const uint8_t* data, size_t len) {
     RenderLock lock;
     return file.write(data, len) == len;

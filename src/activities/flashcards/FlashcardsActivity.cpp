@@ -10,10 +10,8 @@
 #include <cstring>
 
 #include "MappedInputManager.h"
-#include "activities/util/WifiConnectHelper.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
-#include "util/DateUtils.h"
 
 namespace {
 constexpr const char* TAG = "FLASH";
@@ -31,12 +29,7 @@ void FlashcardsActivity::onEnter() {
   Activity::onEnter();
   Storage.ensureDirectoryExists("/apps");
   Storage.ensureDirectoryExists("/apps/flashcards");
-
-  if (!DateUtils::hasValidTime()) {
-    screen = Screen::NoClock;
-  } else {
-    loadResources();
-  }
+  loadResources();
   requestUpdate();
 }
 
@@ -78,20 +71,6 @@ void FlashcardsActivity::persist() {
   ratingsSinceSave = 0;
 }
 
-void FlashcardsActivity::syncClock() {
-  ensureWifiConnected([this]() {
-    {
-      RenderLock lock;
-      GUI.drawPopup(renderer, tr(STR_SYNCING_TIME));
-      renderer.displayBuffer();
-    }
-    if (WifiConnectHelper::waitForTimeSync() && DateUtils::hasValidTime()) {
-      loadResources();
-    }
-    requestUpdate();
-  });
-}
-
 void FlashcardsActivity::showNextCard() {
   currentIndex = scheduler.nextCard();
   if (currentIndex == FlashcardScheduler::INVALID_INDEX) {
@@ -121,14 +100,6 @@ void FlashcardsActivity::loop() {
   const bool right = mappedInput.wasReleased(Button::Right);
 
   switch (screen) {
-    case Screen::NoClock:
-      if (back) {
-        finish();
-      } else if (confirm) {
-        syncClock();
-      }
-      break;
-
     case Screen::NoDeck:
       if (back || confirm) finish();
       break;
@@ -139,9 +110,17 @@ void FlashcardsActivity::loop() {
       } else if (confirm) {
         showNextCard();
       } else if (left) {
-        scheduler.setNewPerDay(scheduler.newPerDay() - NEW_PER_DAY_STEP);
+        scheduler.rewindDay();
+        persist();
         requestUpdate();
       } else if (right) {
+        scheduler.advanceDay();
+        persist();
+        requestUpdate();
+      } else if (mappedInput.wasReleased(Button::Down)) {
+        scheduler.setNewPerDay(scheduler.newPerDay() - NEW_PER_DAY_STEP);
+        requestUpdate();
+      } else if (mappedInput.wasReleased(Button::Up)) {
         scheduler.setNewPerDay(scheduler.newPerDay() + NEW_PER_DAY_STEP);
         requestUpdate();
       }
@@ -187,9 +166,6 @@ void FlashcardsActivity::loop() {
 void FlashcardsActivity::render(RenderLock&&) {
   renderer.clearScreen();
   switch (screen) {
-    case Screen::NoClock:
-      renderMessage(tr(STR_APP_CLOCK_NOT_SET), tr(STR_APP_CLOCK_HINT));
-      break;
     case Screen::NoDeck:
       renderMessage(tr(STR_FC_DECK_MISSING), tr(STR_FC_DECK_MISSING_HINT));
       break;
@@ -225,15 +201,16 @@ void FlashcardsActivity::renderMessage(const char* title, const char* hint) {
     y += lineHeight;
   }
 
-  const bool canSync = screen == Screen::NoClock;
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), canSync ? tr(STR_CLOCK_SYNC) : "", "", "");
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 }
 
 void FlashcardsActivity::renderOverview() {
   const auto& metrics = UITheme::getInstance().getMetrics();
   const int pageWidth = renderer.getScreenWidth();
-  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_FLASHCARDS));
+  char subtitle[24];
+  snprintf(subtitle, sizeof(subtitle), "%s %lu", tr(STR_FC_DAY), static_cast<unsigned long>(scheduler.day()));
+  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_FLASHCARDS), subtitle);
 
   const auto counts = scheduler.counts();
   const int rowHeight = metrics.listRowHeight;
@@ -272,21 +249,18 @@ void FlashcardsActivity::renderOverview() {
     y += rowHeight;
   }
 
+  y += metrics.verticalSpacing;
+  renderer.drawCenteredText(SMALL_FONT_ID, y, tr(STR_FC_SIDE_HINT));
+  y += renderer.getLineHeight(SMALL_FONT_ID) + metrics.verticalSpacing * 2;
+
   const bool nothingDue = counts.newAvailable == 0 && counts.learningDue == 0 && counts.reviewDue == 0;
   if (nothingDue) {
-    y += metrics.verticalSpacing * 2;
     renderer.drawCenteredText(UI_10_FONT_ID, y, tr(STR_FC_NOTHING_DUE));
-    const uint32_t wait = scheduler.secondsUntilNextDue();
-    if (wait != UINT32_MAX && wait > 0) {
-      char buf[48];
-      char interval[16];
-      formatInterval(interval, sizeof(interval), wait);
-      snprintf(buf, sizeof(buf), "%s %s", tr(STR_FC_NEXT_DUE_IN), interval);
-      renderer.drawCenteredText(UI_10_FONT_ID, y + renderer.getLineHeight(UI_10_FONT_ID) + 4, buf);
-    }
+    y += renderer.getLineHeight(UI_10_FONT_ID) + 4;
+    renderNextDueHint(y);
   }
 
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_FC_STUDY), tr(STR_FC_FEWER_NEW), tr(STR_FC_MORE_NEW));
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_FC_STUDY), tr(STR_FC_PREV_DAY), tr(STR_FC_NEXT_DAY));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 }
 
@@ -445,16 +419,30 @@ void FlashcardsActivity::renderDone() {
   renderer.drawCenteredText(UI_12_FONT_ID, y, buf);
   y += renderer.getLineHeight(UI_12_FONT_ID) + 4;
 
-  const uint32_t wait = scheduler.secondsUntilNextDue();
-  if (wait != UINT32_MAX) {
-    char interval[16];
-    formatInterval(interval, sizeof(interval), wait);
-    snprintf(buf, sizeof(buf), "%s %s", tr(STR_FC_NEXT_DUE_IN), interval);
-    renderer.drawCenteredText(UI_10_FONT_ID, y, buf);
-  }
+  renderNextDueHint(y);
 
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_OK_BUTTON), "", "");
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
+}
+
+// Learning steps fall due within the day; anything further needs the user to start a new day.
+void FlashcardsActivity::renderNextDueHint(int y) {
+  const uint32_t wait = scheduler.secondsUntilNextDue();
+  if (wait == UINT32_MAX || wait == 0) return;
+  const int pageWidth = renderer.getScreenWidth();
+  if (wait >= FlashcardScheduler::SECONDS_PER_DAY) {
+    const auto lines = renderer.wrappedText(UI_10_FONT_ID, tr(STR_FC_DAY_HINT), pageWidth - SIDE_PADDING * 2, 2);
+    for (const auto& line : lines) {
+      renderer.drawCenteredText(UI_10_FONT_ID, y, line.c_str());
+      y += renderer.getLineHeight(UI_10_FONT_ID);
+    }
+    return;
+  }
+  char buf[48];
+  char interval[16];
+  formatInterval(interval, sizeof(interval), wait);
+  snprintf(buf, sizeof(buf), "%s %s", tr(STR_FC_NEXT_DUE_IN), interval);
+  renderer.drawCenteredText(UI_10_FONT_ID, y, buf);
 }
 
 void FlashcardsActivity::formatInterval(char* buf, size_t bufSize, uint32_t seconds) {
