@@ -1,6 +1,7 @@
 #include "Briefing.h"
 
 #include <ArduinoJson.h>
+#include <ESPmDNS.h>
 #include <HalPowerManager.h>
 #include <HalStorage.h>
 #include <I18n.h>
@@ -10,6 +11,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <vector>
 
 #include "activities/flashcards/FlashcardDeck.h"
 #include "activities/flashcards/FlashcardScheduler.h"
@@ -26,6 +28,7 @@ namespace {
 constexpr const char* TAG = "BRIEF";
 constexpr size_t MAX_TASK_BODY = 4 * 1024;  // Nest sends at most a screenful of lines
 constexpr size_t MAX_TASK_TEXT = 90;
+constexpr int MAX_TASK_LINES = 3;
 constexpr int SIDE_PADDING = 24;
 
 void trim(std::string& s) {
@@ -104,14 +107,40 @@ bool fetchWeather(const Config& config, Data& data) {
 
 // Nest answers with one task per line, calendar events first ("09:30 Standup"),
 // then reminders; overdue reminders carry a "! " prefix. Blank and "#" lines are skipped.
+// "http://name.local:port/..." -> "http://<ip>:port/...": lwIP's resolver does not do mDNS,
+// and the Mac's DHCP address changes, so Nest is addressed by its Bonjour name.
+std::string resolveLocalHost(const std::string& url) {
+  const size_t hostStart = url.find("://");
+  if (hostStart == std::string::npos) return url;
+  const size_t start = hostStart + 3;
+  size_t end = url.find_first_of(":/", start);
+  if (end == std::string::npos) end = url.size();
+  std::string host = url.substr(start, end - start);
+  if (host.size() < 7 || host.compare(host.size() - 6, 6, ".local") != 0) return url;
+  host.resize(host.size() - 6);
+  if (!MDNS.begin("crosspoint")) {
+    LOG_ERR(TAG, "mDNS start failed");
+    return url;
+  }
+  const IPAddress ip = MDNS.queryHost(host.c_str(), 3000);
+  MDNS.end();
+  if (ip == IPAddress()) {
+    LOG_ERR(TAG, "mDNS: %s.local not found", host.c_str());
+    return url;
+  }
+  LOG_INF(TAG, "mDNS: %s.local -> %s", host.c_str(), ip.toString().c_str());
+  return url.substr(0, start) + ip.toString().c_str() + url.substr(end);
+}
+
 bool fetchTasks(const Config& config, Data& data) {
   std::string body;
   body.reserve(1024);
-  const bool ok = HttpDownloader::fetchUrl(config.tasksUrl, [&body](const uint8_t* chunk, size_t len) {
-    if (body.size() >= MAX_TASK_BODY) return false;
-    body.append(reinterpret_cast<const char*>(chunk), std::min(len, MAX_TASK_BODY - body.size()));
-    return true;
-  });
+  const bool ok =
+      HttpDownloader::fetchUrl(resolveLocalHost(config.tasksUrl), [&body](const uint8_t* chunk, size_t len) {
+        if (body.size() >= MAX_TASK_BODY) return false;
+        body.append(reinterpret_cast<const char*>(chunk), std::min(len, MAX_TASK_BODY - body.size()));
+        return true;
+      });
   if (!ok && body.empty()) return false;
 
   data.tasks.clear();
@@ -131,21 +160,47 @@ bool fetchTasks(const Config& config, Data& data) {
   return true;
 }
 
-int drawRow(GfxRenderer& renderer, int fontId, int y, int width, const char* left, const char* right,
-            EpdFontFamily::Style style = EpdFontFamily::REGULAR) {
-  const int rightWidth = right ? renderer.getTextWidth(fontId, right, style) : 0;
-  const std::string leftText = renderer.truncatedText(fontId, left, width - rightWidth - 12, style);
-  renderer.drawText(fontId, SIDE_PADDING, y, leftText.c_str(), true, style);
-  if (right) renderer.drawText(fontId, SIDE_PADDING + width - rightWidth, y, right, true, style);
-  return y + renderer.getLineHeight(fontId) + 4;
+// One drawn line of the scrolling body.
+struct Line {
+  int font;
+  EpdFontFamily::Style style;
+  bool section;  // bold title with a rule under it
+  int indent;
+  std::string left;
+  std::string right;
+};
+
+void addWrapped(GfxRenderer& renderer, std::vector<Line>& lines, int font, EpdFontFamily::Style style, int width,
+                const char* prefix, const std::string& text) {
+  const int prefixWidth = renderer.getTextWidth(font, prefix, style) + 6;
+  const auto wrapped = renderer.wrappedText(font, text.c_str(), width - prefixWidth, MAX_TASK_LINES, style);
+  bool first = true;
+  for (const auto& piece : wrapped) {
+    lines.push_back(
+        {font, style, false, first ? 0 : prefixWidth, first ? std::string(prefix) + " " + piece : piece, ""});
+    first = false;
+  }
+  if (wrapped.empty()) lines.push_back({font, style, false, 0, prefix, ""});
 }
 
-int drawSectionTitle(GfxRenderer& renderer, int y, int width, const char* title) {
-  y += 10;
-  renderer.drawText(UI_12_FONT_ID, SIDE_PADDING, y, title, true, EpdFontFamily::BOLD);
-  y += renderer.getLineHeight(UI_12_FONT_ID) + 2;
-  renderer.fillRect(SIDE_PADDING, y, width, 1, true);
-  return y + 8;
+int lineHeight(GfxRenderer& renderer, const Line& line) {
+  return line.section ? 10 + renderer.getLineHeight(line.font) + 2 + 1 + 8 : renderer.getLineHeight(line.font) + 4;
+}
+
+void drawLine(GfxRenderer& renderer, const Line& line, int y, int width) {
+  if (line.section) {
+    y += 10;
+    renderer.drawText(line.font, SIDE_PADDING, y, line.left.c_str(), true, EpdFontFamily::BOLD);
+    y += renderer.getLineHeight(line.font) + 2;
+    renderer.fillRect(SIDE_PADDING, y, width, 1, true);
+    return;
+  }
+  const int rightWidth = line.right.empty() ? 0 : renderer.getTextWidth(line.font, line.right.c_str(), line.style);
+  const std::string leftText =
+      renderer.truncatedText(line.font, line.left.c_str(), width - line.indent - rightWidth - 12, line.style);
+  renderer.drawText(line.font, SIDE_PADDING + line.indent, y, leftText.c_str(), true, line.style);
+  if (rightWidth > 0)
+    renderer.drawText(line.font, SIDE_PADDING + width - rightWidth, y, line.right.c_str(), true, line.style);
 }
 }  // namespace
 
@@ -256,7 +311,7 @@ bool shouldRefreshAtSleep(const Config& config, const Data& data) {
   return data.fetchedAt == 0 || now < data.fetchedAt || now - data.fetchedAt >= SLEEP_REFRESH_INTERVAL_S;
 }
 
-void render(GfxRenderer& renderer, const Config& config, const Data& data, int bottomInset) {
+Page render(GfxRenderer& renderer, const Config& config, const Data& data, int bottomInset, int scroll) {
   renderer.clearScreen();
   const int pageWidth = renderer.getScreenWidth();
   const int pageHeight = renderer.getScreenHeight() - bottomInset;
@@ -300,56 +355,76 @@ void render(GfxRenderer& renderer, const Config& config, const Data& data, int b
     y += renderer.getLineHeight(UI_10_FONT_ID) + 4;
   }
 
+  std::vector<Line> lines;
+  lines.reserve(48);
+
   // Tasks
   if (!config.tasksUrl.empty()) {
-    y = drawSectionTitle(renderer, y, width, tr(STR_BF_TODAY));
+    lines.push_back({UI_12_FONT_ID, EpdFontFamily::BOLD, true, 0, tr(STR_BF_TODAY), ""});
     if (!data.hasTasks) {
-      y = drawRow(renderer, UI_10_FONT_ID, y, width, tr(STR_BF_TASKS_UNAVAILABLE), nullptr);
+      lines.push_back({UI_10_FONT_ID, EpdFontFamily::REGULAR, false, 0, tr(STR_BF_TASKS_UNAVAILABLE), ""});
     } else if (data.tasks.empty()) {
-      y = drawRow(renderer, UI_10_FONT_ID, y, width, tr(STR_BF_NO_TASKS), nullptr);
+      lines.push_back({UI_10_FONT_ID, EpdFontFamily::REGULAR, false, 0, tr(STR_BF_NO_TASKS), ""});
     } else {
-      const int reserve = renderer.getLineHeight(UI_12_FONT_ID) * 5;  // keep room for the sections below
       for (const auto& task : data.tasks) {
-        if (y + renderer.getLineHeight(NOTOSANS_14_FONT_ID) > bottomLimit - reserve) break;
         const bool overdue = task.rfind("! ", 0) == 0;
-        snprintf(buf, sizeof(buf), "%s %s", overdue ? "!" : "\xE2\x80\xA2", overdue ? task.c_str() + 2 : task.c_str());
-        y = drawRow(renderer, NOTOSANS_14_FONT_ID, y, width, buf, nullptr,
-                    overdue ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
+        addWrapped(renderer, lines, NOTOSANS_14_FONT_ID, overdue ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR, width,
+                   overdue ? "!" : "\xE2\x80\xA2", overdue ? task.substr(2) : task);
       }
     }
   }
 
   // Habits
-  HabitStore habits;
-  habits.load(HabitsActivity::STORE_PATH);
-  if (habits.count() > 0 && y + renderer.getLineHeight(UI_12_FONT_ID) * 3 < bottomLimit) {
-    y = drawSectionTitle(renderer, y, width, tr(STR_HABITS));
-    const uint32_t today = DateUtils::todayIndex();
-    for (uint8_t i = 0; i < habits.count(); i++) {
-      if (y + renderer.getLineHeight(UI_12_FONT_ID) > bottomLimit - renderer.getLineHeight(UI_12_FONT_ID) * 2) break;
-      const uint16_t streak = habits.currentStreak(i, today);
-      snprintf(buf, sizeof(buf), "%u %s", streak, tr(STR_HB_DAYS));
-      std::string label = std::string(habits.isDone(i, today) ? "[x] " : "[  ] ") + habits.name(i);
-      y = drawRow(renderer, UI_12_FONT_ID, y, width, label.c_str(), streak > 0 ? buf : "");
+  {
+    HabitStore habits;
+    habits.load(HabitsActivity::STORE_PATH);
+    if (habits.count() > 0) {
+      lines.push_back({UI_12_FONT_ID, EpdFontFamily::BOLD, true, 0, tr(STR_HABITS), ""});
+      const uint32_t today = DateUtils::todayIndex();
+      for (uint8_t i = 0; i < habits.count(); i++) {
+        const uint16_t streak = habits.currentStreak(i, today);
+        snprintf(buf, sizeof(buf), "%u %s", streak, tr(STR_HB_DAYS));
+        lines.push_back({UI_12_FONT_ID, EpdFontFamily::REGULAR, false, 0,
+                         std::string(habits.isDone(i, today) ? "[x] " : "[  ] ") + habits.name(i),
+                         streak > 0 ? buf : ""});
+      }
     }
   }
 
   // Flashcards
   {
     FlashcardDeck deck;
-    if (deck.open(FlashcardsActivity::DECK_PATH) && y + renderer.getLineHeight(UI_12_FONT_ID) * 3 < bottomLimit) {
+    if (deck.open(FlashcardsActivity::DECK_PATH)) {
       FlashcardScheduler scheduler;
       if (scheduler.init(deck.count(), FlashcardsActivity::PROGRESS_PATH)) {
         const auto counts = scheduler.counts();
-        y = drawSectionTitle(renderer, y, width, tr(STR_FLASHCARDS));
+        lines.push_back({UI_12_FONT_ID, EpdFontFamily::BOLD, true, 0, tr(STR_FLASHCARDS), ""});
         snprintf(buf, sizeof(buf), "%s %u  (%s %u, %s %u)", tr(STR_FC_DUE),
                  counts.newAvailable + counts.learningDue + counts.reviewDue, tr(STR_FC_NEW), counts.newAvailable,
                  tr(STR_FC_REVIEW), counts.reviewDue);
-        y = drawRow(renderer, UI_12_FONT_ID, y, width, buf, nullptr);
+        lines.push_back({UI_12_FONT_ID, EpdFontFamily::REGULAR, false, 0, buf, ""});
         scheduler.release();
       }
       deck.close();
     }
+  }
+
+  // Body: draw whole lines from the first one at or past `scroll`; stop at the first that does not fit.
+  Page page;
+  page.viewHeight = bottomLimit - y;
+  int lineTop = 0;
+  int drawY = y;
+  for (const auto& line : lines) {
+    const int h = lineHeight(renderer, line);
+    if (lineTop >= scroll) {
+      if (drawY + h > bottomLimit) {
+        page.nextScroll = lineTop;
+        break;
+      }
+      drawLine(renderer, line, drawY, width);
+      drawY += h;
+    }
+    lineTop += h;
   }
 
   // Footer
@@ -363,6 +438,12 @@ void render(GfxRenderer& renderer, const Config& config, const Data& data, int b
   snprintf(buf, sizeof(buf), "%s %s   %s %u%%", tr(STR_BF_UPDATED), data.fetchedAt ? updated : tr(STR_BF_NEVER),
            tr(STR_BF_BATTERY), powerManager.getBatteryPercentage());
   renderer.drawText(SMALL_FONT_ID, SIDE_PADDING, pageHeight - footerHeight + 6, buf);
+  if (page.nextScroll >= 0 || scroll > 0) {
+    const char* more = page.nextScroll >= 0 ? tr(STR_BF_MORE) : tr(STR_BF_TOP);
+    renderer.drawText(SMALL_FONT_ID, SIDE_PADDING + width - renderer.getTextWidth(SMALL_FONT_ID, more),
+                      pageHeight - footerHeight + 6, more);
+  }
+  return page;
 }
 
 }  // namespace Briefing

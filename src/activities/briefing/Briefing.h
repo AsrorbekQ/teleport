@@ -49,7 +49,14 @@ bool saveCache(const Data& data);
 bool refresh(const Config& config, Data& data, std::string& error);
 bool shouldRefreshAtSleep(const Config& config, const Data& data);
 
-// Draws the briefing into the framebuffer (does not call displayBuffer).
-void render(GfxRenderer& renderer, const Config& config, const Data& data, int bottomInset = 0);
+struct Page {
+  int nextScroll = -1;  // scroll value that shows the next page, -1 when everything fit
+  int viewHeight = 0;   // height of the scrolling body
+};
+
+// Draws the briefing into the framebuffer (does not call displayBuffer). Date and
+// weather stay at the top; tasks, habits and flashcards scroll by whole lines
+// starting at `scroll` (a value previously returned in Page::nextScroll).
+Page render(GfxRenderer& renderer, const Config& config, const Data& data, int bottomInset = 0, int scroll = 0);
 
 }  // namespace Briefing

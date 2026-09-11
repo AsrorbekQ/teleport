@@ -5,6 +5,8 @@
 #include <Logging.h>
 #include <WiFi.h>
 
+#include <algorithm>
+
 #include "MappedInputManager.h"
 #include "SilentRestart.h"
 #include "activities/util/WifiConnectHelper.h"
@@ -51,16 +53,29 @@ void BriefingActivity::loop() {
   if (mappedInput.wasReleased(Button::Back)) {
     finish();
   } else if (mappedInput.wasReleased(Button::Confirm)) {
+    scroll = 0;
     refreshNow();
+  } else if (mappedInput.wasReleased(Button::Down) || mappedInput.wasReleased(Button::Right)) {
+    if (page.nextScroll >= 0) {
+      scroll = page.nextScroll;
+      requestUpdate();
+    }
+  } else if (mappedInput.wasReleased(Button::Up) || mappedInput.wasReleased(Button::Left)) {
+    if (scroll > 0) {
+      scroll = std::max(0, scroll - page.viewHeight);
+      requestUpdate();
+    }
   }
 }
 
 void BriefingActivity::render(RenderLock&&) {
   const auto& metrics = UITheme::getInstance().getMetrics();
-  Briefing::render(renderer, config, data, metrics.buttonHintsHeight + renderer.getLineHeight(UI_10_FONT_ID) + 16);
-
   const int pageWidth = renderer.getScreenWidth();
   const int pageHeight = renderer.getScreenHeight();
+  const int noteHeight = renderer.getLineHeight(UI_10_FONT_ID) + 8;
+  // The note gets its own band above the button hints so it never covers the page.
+  page = Briefing::render(renderer, config, data, metrics.buttonHintsHeight + noteHeight, scroll);
+
   const char* note = nullptr;
   if (!statusMessage.empty()) {
     note = statusMessage.c_str();
@@ -70,8 +85,7 @@ void BriefingActivity::render(RenderLock&&) {
     note = tr(STR_BF_DISABLED_HINT);
   }
   if (note) {
-    const int y = pageHeight - metrics.buttonHintsHeight - renderer.getLineHeight(UI_10_FONT_ID) * 2 - 10;
-    renderer.fillRect(0, y - 4, pageWidth, renderer.getLineHeight(UI_10_FONT_ID) + 8, false);
+    const int y = pageHeight - metrics.buttonHintsHeight - noteHeight + 4;
     renderer.drawCenteredText(UI_10_FONT_ID, y, renderer.truncatedText(UI_10_FONT_ID, note, pageWidth - 20).c_str());
   }
 

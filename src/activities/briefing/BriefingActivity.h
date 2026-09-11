@@ -21,6 +21,8 @@ class BriefingActivity final : public Activity {
   Briefing::Data data;
   std::string statusMessage;
   bool wifiWasUsed = false;
+  int scroll = 0;
+  Briefing::Page page;
 
   void refreshNow();
 };
