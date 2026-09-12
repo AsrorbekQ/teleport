@@ -90,6 +90,7 @@ bool fetchWeather(const Config& config, Data& data) {
            "&daily=temperature_2m_max,temperature_2m_min&forecast_days=1&timezone=auto",
            static_cast<double>(config.lat), static_cast<double>(config.lon));
   std::string body;
+  body.reserve(2048);  // reserved before the TLS session so nothing grows while the heap is at its low
   if (!HttpDownloader::fetchUrl(url, body)) return false;
   JsonDocument doc;
   if (deserializeJson(doc, body) != DeserializationError::Ok || doc["current_weather"].isNull()) {
@@ -134,7 +135,7 @@ std::string resolveLocalHost(const std::string& url) {
 
 bool fetchTasks(const Config& config, Data& data) {
   std::string body;
-  body.reserve(1024);
+  body.reserve(MAX_TASK_BODY);  // reserved before connecting; see fetchWeather
   const bool ok =
       HttpDownloader::fetchUrl(resolveLocalHost(config.tasksUrl), [&body](const uint8_t* chunk, size_t len) {
         if (body.size() >= MAX_TASK_BODY) return false;

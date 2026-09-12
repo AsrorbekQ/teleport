@@ -2,6 +2,7 @@
 
 #include <HalStorage.h>
 #include <Logging.h>
+#include <Memory.h>
 
 #include <algorithm>
 #include <cstdio>
@@ -42,6 +43,19 @@ std::string extractTitle(const std::string& head) {
   trimLine(cleaned);
   if (cleaned.size() > 120) cleaned.resize(120);
   return cleaned;
+}
+
+// First TITLE_SCAN_BYTES of a saved page, read after the connection is closed and memory is back.
+std::string readHead(const std::string& path) {
+  HalFile file;
+  if (!Storage.openFileForRead(TAG, path.c_str(), file)) return "";
+  auto buf = makeUniqueNoThrow<char[]>(TITLE_SCAN_BYTES);
+  if (!buf) {
+    LOG_ERR(TAG, "OOM: %u byte title buffer", static_cast<unsigned>(TITLE_SCAN_BYTES));
+    return "";
+  }
+  const int n = file.read(buf.get(), TITLE_SCAN_BYTES);
+  return n > 0 ? std::string(buf.get(), static_cast<size_t>(n)) : "";
 }
 }  // namespace
 
@@ -158,13 +172,11 @@ bool ReadLaterStore::fetch(size_t index, std::string& error) {
     return false;
   }
 
+  // Nothing may allocate inside the callback: with the TLS session open the heap is down to
+  // ~16 KB and a failed std::string growth aborts. The title is read back from the file later.
   size_t written = 0;
-  std::string head;
   bool truncated = false;
   const bool ok = HttpDownloader::fetchUrl(entry.url, [&](const uint8_t* data, size_t len) {
-    if (head.size() < TITLE_SCAN_BYTES) {
-      head.append(reinterpret_cast<const char*>(data), std::min(len, TITLE_SCAN_BYTES - head.size()));
-    }
     if (written + len > MAX_PAGE_BYTES) {
       len = MAX_PAGE_BYTES - written;
       truncated = true;
@@ -191,7 +203,7 @@ bool ReadLaterStore::fetch(size_t index, std::string& error) {
 
   entry.cached = true;
   if (entry.title.empty()) {
-    const std::string title = extractTitle(head);
+    const std::string title = extractTitle(readHead(path));
     if (!title.empty()) entry.title = title;
   }
   return true;
