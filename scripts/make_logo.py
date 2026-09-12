@@ -1,8 +1,11 @@
 """Converts an RGBA logo PNG into the 1-bit header used by drawImage (1 = white, MSB first,
-rows packed; stored rotated 90 degrees like the original Logo120.h)."""
+rows packed; stored rotated 90 degrees like the original Logo120.h).
+
+usage: make_logo.py source.png Logo120.h Logo120.png preview.png [threshold|dither]"""
 from PIL import Image, ImageOps
 import sys
 src, out_h, out_png, preview = sys.argv[1:5]
+mode = sys.argv[5] if len(sys.argv) > 5 else 'dither'
 SIZE = 120; INNER = 108
 im = Image.open(src).convert('RGBA')
 bg = Image.new('RGBA', im.size, (255, 255, 255, 255)); bg.alpha_composite(im)
@@ -14,7 +17,11 @@ w, h = g.size; scale = INNER / max(w, h)
 g = g.resize((max(1, round(w * scale)), max(1, round(h * scale))), Image.LANCZOS)
 canvas = Image.new('L', (SIZE, SIZE), 255)
 canvas.paste(g, ((SIZE - g.width) // 2, (SIZE - g.height) // 2))
-bw = canvas.point(lambda p: 255 if p > 150 else 0)
+if mode == 'dither':
+    # Stretch the shading so the lit and shadowed faces stay distinct after dithering.
+    bw = ImageOps.autocontrast(canvas, cutoff=1).convert('1', dither=Image.FLOYDSTEINBERG).convert('L')
+else:
+    bw = canvas.point(lambda p: 255 if p > 150 else 0)
 bw.save(preview)
 rot = bw.rotate(90, expand=True)  # same storage orientation as the stock logo
 rot.convert('RGBA').save(out_png)
