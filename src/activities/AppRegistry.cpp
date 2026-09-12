@@ -28,20 +28,15 @@ AppRegistry::AppRegistry() {
       []() { return tr(STR_FLASHCARDS); }, UIIcon::Flashcards,
       [](GfxRenderer& r, MappedInputManager& i) { return std::make_unique<FlashcardsActivity>(r, i); }));
 
-  // Habits App
-  apps.push_back(std::make_unique<App>(
-      []() { return tr(STR_HABITS); }, UIIcon::Habits,
-      [](GfxRenderer& r, MappedInputManager& i) { return std::make_unique<HabitsActivity>(r, i); }));
-
   // Briefing App
   apps.push_back(std::make_unique<App>(
       []() { return tr(STR_BRIEFING); }, UIIcon::Dashboard,
       [](GfxRenderer& r, MappedInputManager& i) { return std::make_unique<BriefingActivity>(r, i); }));
 
-  // Settings
+  // Habits App
   apps.push_back(std::make_unique<App>(
-      []() { return tr(STR_SETTINGS_TITLE); }, UIIcon::Settings,
-      [](GfxRenderer& r, MappedInputManager& i) { return std::make_unique<SettingsActivity>(r, i); }));
+      []() { return tr(STR_HABITS); }, UIIcon::Habits,
+      [](GfxRenderer& r, MappedInputManager& i) { return std::make_unique<HabitsActivity>(r, i); }));
 
   // Browse Files
   apps.push_back(std::make_unique<App>(
@@ -52,6 +47,11 @@ AppRegistry::AppRegistry() {
   apps.push_back(std::make_unique<App>(
       []() { return tr(STR_MENU_RECENT_BOOKS); }, UIIcon::Recent,
       [](GfxRenderer& r, MappedInputManager& i) { return std::make_unique<RecentBooksActivity>(r, i); }));
+
+  // Dice App
+  apps.push_back(std::make_unique<App>("Dice", UIIcon::Dice, [](GfxRenderer& r, MappedInputManager& i) {
+    return std::make_unique<DiceActivity>(r, i);
+  }));
 
   // OPDS Browser (conditionally visible)
   apps.push_back(std::make_unique<App>([]() { return tr(STR_OPDS_BROWSER); }, UIIcon::Library,
@@ -75,13 +75,13 @@ AppRegistry::AppRegistry() {
     return std::make_unique<RssActivity>(r, i);
   }));
 
-  // Dice App
-  apps.push_back(std::make_unique<App>("Dice", UIIcon::Dice, [](GfxRenderer& r, MappedInputManager& i) {
-    return std::make_unique<DiceActivity>(r, i);
-  }));
-
   // File Transfer
   apps.push_back(std::make_unique<App>(
       []() { return tr(STR_FILE_TRANSFER); }, UIIcon::Transfer,
       [](GfxRenderer& r, MappedInputManager& i) { return std::make_unique<CrossPointWebServerActivity>(r, i); }));
+
+  // Settings
+  apps.push_back(std::make_unique<App>(
+      []() { return tr(STR_SETTINGS_TITLE); }, UIIcon::Settings,
+      [](GfxRenderer& r, MappedInputManager& i) { return std::make_unique<SettingsActivity>(r, i); }));
 }
