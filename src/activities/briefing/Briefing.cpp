@@ -328,15 +328,30 @@ Page render(GfxRenderer& renderer, const Config& config, const Data& data, int b
   int y = 28;
   char buf[160];
 
-  // Date
-  if (DateUtils::hasValidTime()) {
-    const time_t local = static_cast<time_t>(DateUtils::todayIndex()) * DateUtils::SECONDS_PER_DAY;
+  // Date: the live clock when synced, otherwise the day of the last refresh (the clock
+  // resets on every power-off, but the cached briefing is still that day's briefing).
+  const bool liveClock = DateUtils::hasValidTime();
+  uint32_t dayIndex = 0;
+  if (liveClock) {
+    dayIndex = DateUtils::todayIndex();
+  } else if (data.fetchedAt != 0) {
+    dayIndex = static_cast<uint32_t>((static_cast<int64_t>(data.fetchedAt) + DateUtils::utcOffsetSeconds()) /
+                                     DateUtils::SECONDS_PER_DAY);
+  }
+  if (dayIndex != 0) {
+    const time_t local = static_cast<time_t>(dayIndex) * DateUtils::SECONDS_PER_DAY;
     struct tm tm;
     gmtime_r(&local, &tm);
     strftime(buf, sizeof(buf), "%A", &tm);
     renderer.drawText(NOTOSANS_18_FONT_ID, SIDE_PADDING, y, buf, true, EpdFontFamily::BOLD);
     y += renderer.getLineHeight(NOTOSANS_18_FONT_ID);
-    strftime(buf, sizeof(buf), "%B %d, %Y", &tm);
+    char date[48];
+    strftime(date, sizeof(date), "%B %d, %Y", &tm);
+    if (liveClock) {
+      snprintf(buf, sizeof(buf), "%s", date);
+    } else {
+      snprintf(buf, sizeof(buf), "%s  (%s)", date, tr(STR_BF_AS_OF_REFRESH));
+    }
     renderer.drawText(UI_12_FONT_ID, SIDE_PADDING, y, buf);
     y += renderer.getLineHeight(UI_12_FONT_ID) + 6;
   } else {
@@ -387,7 +402,7 @@ Page render(GfxRenderer& renderer, const Config& config, const Data& data, int b
     habits.load(HabitsActivity::STORE_PATH);
     if (habits.count() > 0) {
       lines.push_back({UI_12_FONT_ID, EpdFontFamily::BOLD, true, 0, tr(STR_HABITS), ""});
-      const uint32_t today = DateUtils::todayIndex();
+      const uint32_t today = dayIndex != 0 ? dayIndex : DateUtils::todayIndex();
       for (uint8_t i = 0; i < habits.count(); i++) {
         const uint16_t streak = habits.currentStreak(i, today);
         snprintf(buf, sizeof(buf), "%u %s", streak, tr(STR_HB_DAYS));
