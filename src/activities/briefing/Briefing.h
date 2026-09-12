@@ -19,8 +19,13 @@ constexpr uint32_t SLEEP_REFRESH_INTERVAL_S = 6 * 3600;
 constexpr uint16_t MIN_BATTERY_FOR_FETCH = 20;
 constexpr size_t MAX_TASKS = 12;
 
+enum class SleepRefresh : uint8_t { Never = 0, Stale = 1, Always = 2 };
+
 struct Config {
-  bool enabled = false;  // fetch and show at sleep time
+  bool enabled = false;  // show the briefing as the sleep screen
+  // When to fetch at sleep time. The device has no battery-backed clock, so "stale" only
+  // trusts the cache age after an NTP sync this session; otherwise it fetches only an empty cache.
+  SleepRefresh sleepRefresh = SleepRefresh::Stale;
   bool hasLocation = false;
   float lat = 0;
   float lon = 0;

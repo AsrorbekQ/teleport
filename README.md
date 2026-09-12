@@ -1,82 +1,63 @@
 # Teleport
 
+Teleport is custom firmware for the Xteink X4 e-ink reader, built for one person's daily use: reading, a GRE vocabulary deck, habit tracking, a morning briefing, and an offline reading queue. It started from [CrossPoint Apps](https://github.com/zakerytclarke/crosspoint-reader-apps), which in turn builds on [CrossPoint Reader](https://github.com/crosspoint-reader/crosspoint-reader). The EPUB engine, fonts, library and settings come from those projects; the apps, the companion desktop app and most of the networking work here are Teleport's own.
 
-**Teleport** is a personal fork of [CrossPoint Apps](https://github.com/zakerytclarke/crosspoint-reader-apps), itself a community-driven fork of the original [CrossPoint Reader](https://github.com/crosspoint-reader/crosspoint-reader) project. While the upstream project focuses solely on e-reading, this fork expands the capabilities of the Xteink X4 device by supporting a robust ecosystem of **apps and utilities**. 
-
-Our goal is to make the device more useful in your day-to-day life without compromising its battery life, stability, or its core mission as an distraction-free e-ink reader.
-
-**Now running on:** ESP32C3-based Xteink [X4](https://www.xteink.com/products/xteink-x4) and [X3](https://www.xteink.com/products/xteink-x3).
-
+The name: this X4 shipped with a locked USB bootloader, so firmware can only travel to it on the SD card.
 
 <img src="./docs/images/apps/homescreen.jpg" alt="Home screen" width="50%">
 
-## Features
+## What is on the device
 
-In addition to all the fantastic EPUB rendering, custom fonts, and library management features from the upstream CrossPoint project, **Teleport** includes a suite of applications and technical capabilities. Its companion app, [Nest](https://github.com/AsrorbekQ/teleport-nest), converts web pages, documents and RSS feeds to EPUB on your computer and syncs them over Wi-Fi.
+| App | What it does |
+|---|---|
+| **Flashcards** | Anki-style spaced repetition (SM-2: learning steps, graduation, ease, lapses) for one deck on the card. No clock needed: you advance the study day yourself with Day - / Day +, and the side buttons set how many new cards per day. |
+| **Habits** | Daily check-ins with streaks and a 12-week grid. Bulk-edit dates from the computer with `scripts/habits_tool.py`. |
+| **Briefing** | Date, weather (Open-Meteo), today's tasks from Apple Calendar and Reminders (served by Nest), habit streaks and cards due. Pages with Up/Down. Can be shown as the sleep screen and refreshed at sleep time with a configurable policy. |
+| **Read Later** | A queue of web pages pushed from Nest, the RSS app or `POST /api/readlater`. The reader fetches and caches each page for offline reading. |
+| **RSS** | Feed reader with offline cache. Right on a post sends it to Read Later. Feeds are cut at 512 KB so full-text Substack feeds finish. |
+| **Dice** | Dice, coin, spinner and 8-ball, inherited from CrossPoint Apps. |
+| Browse Files, Recent, OPDS, File Transfer, Settings | From CrossPoint. |
 
-- **Markdown & HTML Parser**: Features a custom parser and renderer that gracefully strips HTML tags and translates basic Markdown, allowing web content (like RSS articles and Reddit) to be displayed elegantly in the native text reader engine.
-- **Flashcards**: Anki-style spaced repetition (SM-2) for a vocabulary deck stored on the SD card. Convert an `.apkg` export with `scripts/anki_to_deck.py` and copy the result to `/apps/flashcards/gre.deck`.
-- **Habits**: Daily habit check-ins with streaks and a 12-week completion grid. Fully offline; only needs the clock synced once.
-- **Read Later**: Queue web pages from [Nest](https://github.com/AsrorbekQ/teleport-nest) (or `POST /api/readlater`); the device fetches and caches them for offline reading.
-- **Briefing**: A morning dashboard with the date, weather (Open-Meteo), today's tasks from Apple Reminders and Calendar (via Nest), habit streaks and flashcards due. Optionally fetched at sleep time and left on the e-ink screen overnight. Configure it from Nest.
-- **Dice & 8-Ball**: A handy utility for tabletop gamers. Roll D6, D20, spin arrows, flip coins, or consult the Magic 8-Ball.
-- **RSS Feed & Reddit**: Subscribe to your favorite blogs and news sites. Articles are downloaded and cached for distraction-free, offline reading using the native text reader engine.
+Removed from the upstream app set: Calculator, Weather, Chess, Sudoku, DuckDuckGo, Wikipedia. The home menu order is Flashcards, Habits, Briefing, Settings, then the rest, with File Transfer last.
 
+Card layout: `/Books`, `/Articles`, `/Digests`, `/Papers` for reading material; `/apps/<app>/` for each app's data.
 
-## Gallery
-<table width="100%">
-  <tr>
-    <td><img src="./docs/images/apps/rss.png" alt="RSS" width="100%"></td>
-    <td><img src="./docs/images/apps/reddit.png" alt="Reddit" width="100%"></td>
-  </tr>
-  <tr>
-    <td><img src="./docs/images/apps/markdown.png" alt="Markdown" width="100%"></td>
-    <td><img src="./docs/images/apps/html.png" alt="HTML" width="100%"></td>
-    <td><img src="./docs/images/apps/dice.png" alt="Dice" width="100%"></td>
-  </tr>
-</table>
+## Nest, the companion app
 
+[Nest](https://github.com/AsrorbekQ/teleport-nest) runs on the Mac and talks to the reader's File Transfer web server over Wi-Fi. It converts web pages, documents and RSS digests to EPUB with a folder picker for each send, queues Read Later links, edits habits, feeds and the briefing config, rebuilds the flashcard deck from an Anki `.apkg`, and serves today's Calendar events and Reminders as the briefing's task list.
 
+## Technical notes specific to this fork
 
+- **TLS on 380 KB of RAM.** Verifying a chain against a 4096-bit root (Let's Encrypt's ISRG Root X1) runs out of memory at the handshake peak. Teleport ships its own certificate bundle (`certs/`, built by `scripts/gen_crt_bundle.py`) that includes intermediates, and a verification callback in `HttpDownloader` that accepts any bundled certificate as a trust anchor, so verification stops at the 2048-bit intermediate.
+- **Heap during transfers.** With a TLS session open about 16 KB of heap remains. Nothing in a download callback may allocate; buffers are reserved before connecting.
+- **Redirects and IPv4.** `esp_http_client` redirects are followed by capturing `Location` from the response headers; DNS is forced to IPv4 because the device never gets a routable IPv6 address.
+- **Diagnostics without serial.** ESP-IDF logs are captured into a RAM ring buffer; "Save log" in the RSS app writes them to `/log.txt`, and crash reports land in `/crash_report.txt` on the card.
+- **Bonjour.** Nest is addressed as `<mac>.local`; the firmware resolves it with mDNS so a changing DHCP address does not matter.
+- **Virtual time in Flashcards.** The X4 has no battery-backed clock and powers off fully in deep sleep, so the scheduler keeps a study-day counter plus elapsed seconds folded in from `millis()`.
 
-## Install Firmware
+## Flashing
 
-### Web Installer
+The USB bootloader on the author's unit is locked, so there is no web-flasher path here.
 
-1. Download the pre-compiled binary from this repository: [`bin/crosspoint-apps.bin`](./bin/crosspoint-apps.bin).
-2. Connect your device to your computer via USB-C and wake/unlock the device.
-3. Go to the [Web Flasher](https://crosspointreader.com/#flash-tools), select your device (X3 or X4).
-4. Click "Custom .bin" and upload the `crosspoint-apps.bin` file you just downloaded.
+1. Build: `pio run -e default` (PlatformIO). The image is `.pio/build/default/firmware.bin`.
+2. Copy it to the root of the SD card as `update.bin`, either by mounting the card or by uploading it while File Transfer is open: `curl -F "file=@firmware.bin;filename=update.bin" "http://crosspoint.local/upload?path=/"`.
+3. Power off, then hold Power and Up until the updater runs.
 
-### Development Quick Start / Command Line
+If your unit's bootloader is unlocked, `pio run -t upload` over USB-C works too.
 
-1. Clone this repository:
-```bash
-git clone --recursive https://github.com/AsrorbekQ/teleport.git
-cd teleport
-```
+## Repository layout
 
-2. Install PlatformIO (if you haven't already).
-3. Connect your device via USB-C.
-4. Build and flash the firmware:
-```bash
-pio run --target upload
-```
+- `src/activities/{flashcards,habits,briefing,readlater,rss}` — the apps
+- `src/network/HttpDownloader.*` — HTTPS client with the custom trust bundle
+- `scripts/anki_to_deck.py` — `.apkg` to `gre.deck`
+- `scripts/habits_tool.py` — `habits.bin` to editable text and back
+- `scripts/gen_crt_bundle.py` — builds the certificate bundle at compile time
+- `scripts/make_logo.py` — converts a PNG into the 1-bit boot logo
+- `local/` — gitignored personal data (feeds, habits, briefing config)
+- `docs/` — file formats and internals inherited from CrossPoint
 
-## Community Contributions
+Developer rules for the ESP32-C3 constraints are in [CLAUDE.md](./CLAUDE.md).
 
-We enthusiastically welcome contributions! If you have an idea for an app that would be useful on an e-ink device, we want it. 
+## License and credits
 
-We strongly encourage apps that are **offline-first**—meaning they do not require a constant Wi-Fi connection to function. Use the SD card to cache data (like Reddit posts or RSS feeds) so users can refresh their feeds once and read them anywhere.
-
-See [CLAUDE.md](./CLAUDE.md) for detailed developer guidelines on how to build apps that respect the constraints of the ESP32-C3 and the e-ink display.
-
-## Documentation
-
-- [User Guide](./USER_GUIDE.md) - Learn how to use the device and the new apps.
-- [Project Scope](./SCOPE.md) - Understand our philosophy on what makes a good app.
-- [Developer Guidelines](./CLAUDE.md) - Read this before contributing code or new apps!
-
----
-
-Teleport is a personal fork and is **not affiliated with Xteink or any device manufacturer**.
+MIT, as inherited. Copyright for the CrossPoint Reader engine belongs to Dave Allie and contributors; CrossPoint Apps by Zakery Clarke and contributors. Teleport's additions are © Asrorbek Qalandarov. Not affiliated with Xteink.

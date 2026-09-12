@@ -214,6 +214,10 @@ Config loadConfig() {
       config.enabled = value == "1" || value == "true";
     else if (key == "tasks_url")
       config.tasksUrl = value;
+    else if (key == "sleep_refresh")
+      config.sleepRefresh = value == "never"    ? SleepRefresh::Never
+                            : value == "always" ? SleepRefresh::Always
+                                                : SleepRefresh::Stale;
     else if (key == "city")
       config.city = value;
     else if (key == "lat")
@@ -304,12 +308,14 @@ bool refresh(const Config& config, Data& data, std::string& error) {
 }
 
 bool shouldRefreshAtSleep(const Config& config, const Data& data) {
-  if (!config.enabled) return false;
+  if (!config.enabled || config.sleepRefresh == SleepRefresh::Never) return false;
   if (!config.hasLocation && config.tasksUrl.empty()) return false;
   if (powerManager.getBatteryPercentage() < MIN_BATTERY_FOR_FETCH) return false;
-  if (!DateUtils::hasValidTime()) return true;
+  if (config.sleepRefresh == SleepRefresh::Always) return true;
+  if (data.fetchedAt == 0) return true;          // nothing cached yet
+  if (!DateUtils::hasValidTime()) return false;  // clock reset by the last power-off: age unknown, keep the cache
   const uint32_t now = DateUtils::nowUtc();
-  return data.fetchedAt == 0 || now < data.fetchedAt || now - data.fetchedAt >= SLEEP_REFRESH_INTERVAL_S;
+  return now < data.fetchedAt || now - data.fetchedAt >= SLEEP_REFRESH_INTERVAL_S;
 }
 
 Page render(GfxRenderer& renderer, const Config& config, const Data& data, int bottomInset, int scroll) {
