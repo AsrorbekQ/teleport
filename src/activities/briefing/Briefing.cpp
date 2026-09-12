@@ -345,13 +345,7 @@ Page render(GfxRenderer& renderer, const Config& config, const Data& data, int b
     strftime(buf, sizeof(buf), "%A", &tm);
     renderer.drawText(NOTOSANS_18_FONT_ID, SIDE_PADDING, y, buf, true, EpdFontFamily::BOLD);
     y += renderer.getLineHeight(NOTOSANS_18_FONT_ID);
-    char date[48];
-    strftime(date, sizeof(date), "%B %d, %Y", &tm);
-    if (liveClock) {
-      snprintf(buf, sizeof(buf), "%s", date);
-    } else {
-      snprintf(buf, sizeof(buf), "%s  (%s)", date, tr(STR_BF_AS_OF_REFRESH));
-    }
+    strftime(buf, sizeof(buf), "%B %d, %Y", &tm);
     renderer.drawText(UI_12_FONT_ID, SIDE_PADDING, y, buf);
     y += renderer.getLineHeight(UI_12_FONT_ID) + 6;
   } else {
