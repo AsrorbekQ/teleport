@@ -40,7 +40,7 @@ Card layout: `/Books`, `/Articles`, `/Digests`, `/Papers` for reading material; 
 The USB bootloader on the author's unit is locked, so there is no web-flasher path here.
 
 1. Build: `pio run -e default` (PlatformIO). The image is `.pio/build/default/firmware.bin`.
-2. Copy it to the root of the SD card as `update.bin`, either by mounting the card or by uploading it while File Transfer is open: `curl -F "file=@firmware.bin;filename=update.bin" "http://crosspoint.local/upload?path=/"`.
+2. Copy it anywhere on the SD card — the updater lists every `.bin` on the card and you pick one — either by mounting the card or by uploading it while File Transfer is open: `curl -F "file=@firmware.bin" "http://crosspoint.local/upload?path=/"`.
 3. Power off, then hold Power and Up until the updater runs.
 
 If your unit's bootloader is unlocked, `pio run -t upload` over USB-C works too.

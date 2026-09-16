@@ -220,7 +220,7 @@ The Settings screen allows you to configure the device's behavior. There are a f
 - **KOReader Sync**: Options for setting up KOReader for syncing book progress.
 - **OPDS Servers**: Manage one or more OPDS [(Open Publication Distribution System)](https://en.wikipedia.org/wiki/Open_Publication_Distribution_System) libraries for browsing and downloading books. See [OPDS Servers (Multiple Libraries)](#365-opds-servers-multiple-libraries) below.
 - **Clear Reading Cache**: Clear the internal SD card cache.
-- **Check for updates**: Check for Crosspoint firmware updates over WiFi. Firmware can also be updated without a USB connection by placing a `firmware.bin` file on the SD card.
+- **Check for updates**: Check for Teleport firmware updates over WiFi. Firmware can also be updated without a USB connection by placing a `.bin` file anywhere on the SD card and picking it from **SD Firmware Update** (or by holding Power and Up at boot).
 - **Language**: Set the UI language. CrossPoint supports 22 languages including English, Spanish, French, German, Czech, Portuguese, Russian, Swedish, Turkish, Danish, Finnish, Polish, Dutch, Belarusian, Italian, Ukrainian, Romanian, Catalan, Vietnamese, Kazakh, Slovenian, and more.
 - **Manage Fonts**: Browse, download, and manage custom font families installed from the SD card. See [Custom Fonts (SD Card)](#38-custom-fonts-sd-card) for more information.
 

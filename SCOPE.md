@@ -12,10 +12,9 @@ To provide a lightweight, high-performance firmware that maximizes the utility o
 
 *These are features and apps that directly improve the utility of the device while respecting its hardware constraints.*
 
-* **Core Reading Experience:** All upstream CrossPoint features, including EPUB rendering, typography, hyphenation, library management, and local file transfer.
-* **Productivity Utilities:** Offline tools like Calculators, Calendars, Clocks, and Dice rollers that are useful to have on a secondary, distraction-free screen.
-* **E-Ink Games:** Turn-based, slow-paced games like Chess, Sudoku, or text-based adventures that do not rely on high-framerate animations or color.
-* **Offline-First Feeds & Articles:** RSS readers, Reddit clients, Wikipedia browsers, and other information aggregators. These MUST be designed to fetch data via Wi-Fi only when requested, cache the text locally to the SD card, and then disconnect from the network to allow for battery-friendly offline reading.
+* **Core Reading Experience:** The CrossPoint reading engine as forked — EPUB rendering, typography, hyphenation, library management, and local file transfer.
+* **Productivity Utilities:** Offline tools that earn their place on a secondary, distraction-free screen — habit tracking, spaced-repetition flashcards, the sleep-screen briefing, clocks and dice rollers.
+* **Offline-First Feeds & Articles:** RSS and Read Later. These MUST fetch via Wi-Fi only when requested, cache the text locally to the SD card, and then disconnect from the network to allow for battery-friendly offline reading.
 * **Reference Tools:** Local dictionary lookup, offline documentation viewers, etc.
 
 ### Out-of-Scope
@@ -23,6 +22,7 @@ To provide a lightweight, high-performance firmware that maximizes the utility o
 *These items are rejected because they compromise the device's stability, battery life, or e-ink constraints.*
 
 * **High-Framerate / Animated Games:** E-ink displays have a slow refresh rate. Action games, platformers, or anything requiring rapid screen updates are fundamentally incompatible with this hardware.
+* **Apps That Do Not Earn Their Flash:** The image already sits at 92% of the 6.5 MB app partition. Calculator, Weather, Chess, Sudoku, Wikipedia and DuckDuckGo were removed for this reason; new apps have to displace something.
 * **Always-Online / Background Polling Apps:** Background Wi-Fi tasks rapidly drain the small battery and complicate the single-core CPU's execution. Apps must not poll servers continuously in the background or require a persistent internet connection to function.
 * **Media Playback:** No Audio players or Audio-books. The hardware is not built for this.
 * **Complex Typing Apps:** The device lacks a physical keyboard, making long-form typing tedious. Apps should rely primarily on button-driven navigation, D-pads, and simple selections rather than extensive text entry.
@@ -36,3 +36,12 @@ We warmly welcome community contributions! If you want to build an app for Telep
 3. **Is it entirely button-navigable?** (Does it have intuitive controls using the physical D-pad layout?)
 
 > **Note to Contributors:** If you have an idea for an app and are unsure if it fits the scope, please open a **Discussion** or issue before you start coding! We are eager to help you design it to fit these guidelines.
+
+## 4. Relationship to CrossPoint
+
+Teleport is a fork of [`zakerytclarke/crosspoint-reader-apps`](https://github.com/zakerytclarke/crosspoint-reader-apps),
+itself a fork of the [CrossPoint engine](https://github.com/crosspoint-reader/crosspoint-reader).
+We track the engine opportunistically — take its reading and rendering work,
+decline its app-layer direction — and we ship our own firmware releases. The
+device's update check points at Teleport's releases, not CrossPoint's; installing
+theirs would replace every app on this page. See [docs/upstream.md](docs/upstream.md).
