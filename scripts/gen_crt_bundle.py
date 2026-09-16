@@ -120,9 +120,12 @@ def write_header(path: str, bundle: bytes, count: int):
 
 
 def main(certs_dir=None, output=None):
-    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    certs_dir = certs_dir or os.path.join(root, "certs")
-    output = output or os.path.join(root, "src", "network", "CrtBundle.generated.h")
+    if certs_dir is None or output is None:
+        # Only reachable when run by hand; PlatformIO exec's this file without
+        # __file__ and passes both paths explicitly.
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        certs_dir = certs_dir or os.path.join(root, "certs")
+        output = output or os.path.join(root, "src", "network", "CrtBundle.generated.h")
     bundle, count = build_bundle(load_pems(certs_dir))
     changed = write_header(output, bundle, count)
     print(f"crt bundle: {count} certificates, {len(bundle)} bytes -> {output}{'' if changed else ' (unchanged)'}")
@@ -133,6 +136,12 @@ if __name__ == "__main__":
 else:
     try:
         Import("env")  # noqa: F821  (PlatformIO pre-script context)
-        main()
     except NameError:
-        pass
+        pass  # not running under PlatformIO
+    else:
+        # PlatformIO exec's extra_scripts without __file__, so main() cannot
+        # derive the project root itself. Passing the paths in also keeps a
+        # genuine failure inside main() loud instead of swallowed as a NameError,
+        # which is how this silently produced no bundle at all.
+        _root = env["PROJECT_DIR"]  # noqa: F821
+        main(os.path.join(_root, "certs"), os.path.join(_root, "src", "network", "CrtBundle.generated.h"))

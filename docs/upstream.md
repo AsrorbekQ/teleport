@@ -136,9 +136,10 @@ pio check --fail-on-defect low --fail-on-defect medium --fail-on-defect high
 cppcheck ships inside PlatformIO, so `pio check` needs no install — but it is
 already red: 45 pre-existing low-severity defects in RssActivity, LyraTheme,
 HttpDownloader and the app dirs. The signal is "no *new* defects", not "passes".
-Scope it to what you touched with `--pattern`. CI's `build` job has also been
-failing on every master push since 2026-09-09, so a red CI badge is not evidence
-about your merge.
+Scope it to what you touched with `--pattern`. CI's `clang-format` and `cppcheck`
+jobs are also red for pre-existing reasons (the fork's own files were never run
+through clang-format 21), so a red CI badge is not by itself evidence about your
+merge — read which job failed.
 
 `cmake`, `ninja` and `ctest` are not installed, so the unit tests are CI-only.
 Xcode ships clang-format 21 at
