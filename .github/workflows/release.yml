@@ -2,11 +2,16 @@ name: Compile Release
 on:
   push:
     tags:
-      - '*'
+      # Bare X.Y.Z only: '+' is one-or-more digits. '*' would be a wildcard and
+      # would let 2.0.1-rc1 through, which OtaUpdater's %d.%d.%d parse accepts
+      # as 2.0.1 and every device would install as if it were stable.
+      - '[0-9]+.[0-9]+.[0-9]+'
 
 jobs:
   build-release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v6
         with:
@@ -32,16 +37,34 @@ jobs:
           key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
           restore-keys: pio-${{ runner.os }}-
 
+      # The device compares the release tag against the version baked into the
+      # binary, so a tag that disagrees with the ini publishes an image that can
+      # never satisfy its own update check. Fail before the build, not after.
       - name: Build CrossPoint
-        run: pio run -e gh_release
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          grep -qxF "version = $TAG" platformio.ini || { echo "tag $TAG != [crosspoint] version in platformio.ini"; exit 1; }
+          pio run -e gh_release
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: CrossPoint-${{ github.ref_name }}
+          name: Teleport-${{ github.ref_name }}
           path: |
             .pio/build/gh_release/bootloader.bin
             .pio/build/gh_release/firmware.bin
             .pio/build/gh_release/firmware.elf
             .pio/build/gh_release/firmware.map
             .pio/build/gh_release/partitions.bin
+
+      # The asset has to be named exactly firmware.bin: ReleaseJsonParser
+      # strcmps that name when it scans the release JSON on the device.
+      - name: Publish Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ github.ref_name }}"
+          gh release create "$TAG" .pio/build/gh_release/firmware.bin \
+            --title "Teleport $TAG" --generate-notes \
+            || gh release upload "$TAG" .pio/build/gh_release/firmware.bin --clobber

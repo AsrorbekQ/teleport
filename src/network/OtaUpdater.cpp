@@ -17,7 +17,10 @@
 #include <string>
 
 namespace {
-constexpr char latestReleaseUrl[] = "https://api.github.com/repos/crosspoint-reader/crosspoint-reader/releases/latest";
+// Teleport's own releases. The stock CrossPoint releases this used to point at
+// carry none of Teleport's apps, so installing one silently replaces the whole
+// firmware; see docs/upstream.md.
+constexpr char latestReleaseUrl[] = "https://api.github.com/repos/AsrorbekQ/teleport/releases/latest";
 
 esp_err_t http_client_set_header_cb(esp_http_client_handle_t http_client) {
   return esp_http_client_set_header(http_client, "User-Agent", "CrossPoint-ESP32-" CROSSPOINT_VERSION);
@@ -76,9 +79,11 @@ bool OtaUpdater::isUpdateNewer() const {
 
   const auto currentVersion = CROSSPOINT_VERSION;
 
-  // semantic version check (only match on 3 segments)
-  sscanf(latestVersion.c_str(), "%d.%d.%d", &latestMajor, &latestMinor, &latestPatch);
-  sscanf(currentVersion, "%d.%d.%d", &currentMajor, &currentMinor, &currentPatch);
+  // semantic version check (only match on 3 segments). A tag that is not three
+  // plain numbers ("v1.6.0", "nightly") leaves the locals indeterminate, so
+  // refuse the update instead of comparing stack garbage.
+  if (sscanf(latestVersion.c_str(), "%d.%d.%d", &latestMajor, &latestMinor, &latestPatch) != 3) return false;
+  if (sscanf(currentVersion, "%d.%d.%d", &currentMajor, &currentMinor, &currentPatch) != 3) return false;
 
   /*
    * Compare major versions.
