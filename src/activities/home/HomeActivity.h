@@ -3,10 +3,10 @@
 #include <vector>
 
 #include "./FileBrowserActivity.h"
+#include "RecentBooksStore.h"
 #include "activities/Activity.h"
 #include "util/ButtonNavigator.h"
 
-struct RecentBook;
 struct Rect;
 
 class HomeActivity final : public Activity {
@@ -29,6 +29,7 @@ class HomeActivity final : public Activity {
   int coverRectH = 0;
   std::vector<RecentBook> recentBooks;
   const HomeMenuItem initialMenuItem;
+  const bool cleanInitialRefresh;
 
   int menuItemToIndex(HomeMenuItem item) const;
   void onSelectBook(const std::string& path);
@@ -42,10 +43,13 @@ class HomeActivity final : public Activity {
 
  public:
   explicit HomeActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
-                        HomeMenuItem initialMenuItemValue = HomeMenuItem::NONE)
-      : Activity("Home", renderer, mappedInput), initialMenuItem(initialMenuItemValue) {}
+                        HomeMenuItem initialMenuItemValue = HomeMenuItem::NONE, bool cleanInitialRefresh = false)
+      : Activity("Home", renderer, mappedInput),
+        initialMenuItem(initialMenuItemValue),
+        cleanInitialRefresh(cleanInitialRefresh) {}
   void onEnter() override;
   void onExit() override;
   void loop() override;
   void render(RenderLock&&) override;
+  bool isHomeActivity() const override { return true; }
 };

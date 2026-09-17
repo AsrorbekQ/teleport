@@ -17,6 +17,8 @@
 #include "fontIds.h"
 #include "util/DateUtils.h"
 
+namespace fui = freeink::ui;
+
 namespace {
 constexpr const char* TAG = "HABITS";
 constexpr int SIDE_PADDING = 20;
@@ -28,15 +30,13 @@ uint8_t weekdayOf(uint32_t day) { return static_cast<uint8_t>((day + 3) % 7); }
 }  // namespace
 
 void HabitsActivity::onEnter() {
-  Activity::onEnter();
+  UiListActivity::onEnter();
   Storage.ensureDirectoryExists("/apps");
   Storage.ensureDirectoryExists("/apps/habits");
   store.load(STORE_PATH);
   screen = DateUtils::hasValidTime() ? Screen::List : Screen::NoClock;
   requestUpdate();
 }
-
-void HabitsActivity::onExit() { Activity::onExit(); }
 
 void HabitsActivity::syncClock() {
   ensureWifiConnected([this]() {
@@ -54,8 +54,10 @@ void HabitsActivity::syncClock() {
 
 void HabitsActivity::toggleSelected() {
   if (store.count() == 0) return;
+  const int selected = selectedIndex();
+  if (selected < 0 || selected >= store.count()) return;
   const uint32_t today = DateUtils::todayIndex();
-  const auto index = static_cast<uint8_t>(selectedIndex);
+  const auto index = static_cast<uint8_t>(selected);
   store.setDone(index, today, !store.isDone(index, today));
   // Saved immediately: a check-in is rare and losing it to auto-sleep would be worse than the 1 KB write.
   store.save();
@@ -74,25 +76,28 @@ void HabitsActivity::addHabit() {
     const auto* keyboardResult = std::get_if<KeyboardResult>(&result.data);
     if (keyboardResult && !keyboardResult->text.empty() && store.add(keyboardResult->text.c_str())) {
       store.save();
-      selectedIndex = store.count() - 1;
+      nav.requestSelection(store.count() - 1);
     }
   });
 }
 
 void HabitsActivity::deleteSelected() {
-  store.remove(static_cast<uint8_t>(selectedIndex));
+  store.remove(static_cast<uint8_t>(selectedIndex()));
   store.save();
-  selectedIndex = std::max(0, std::min(selectedIndex, static_cast<int>(store.count()) - 1));
+  nav.requestSelection(std::max(0, std::min(selectedIndex(), static_cast<int>(store.count()) - 1)));
   screen = Screen::List;
   requestUpdate();
 }
 
-void HabitsActivity::loop() {
+// The list screen returns false so the base runs its own Back/Confirm handling,
+// touch routing and selection navigation; every other screen owns the pass.
+bool HabitsActivity::handleCustomInput() {
+  if (screen == Screen::List) return false;
+
   using Button = MappedInputManager::Button;
   const bool back = mappedInput.wasReleased(Button::Back);
   const bool confirm = mappedInput.wasReleased(Button::Confirm);
   const bool left = mappedInput.wasReleased(Button::Left);
-  const bool right = mappedInput.wasReleased(Button::Right);
 
   switch (screen) {
     case Screen::NoClock:
@@ -100,31 +105,6 @@ void HabitsActivity::loop() {
         finish();
       } else if (confirm) {
         syncClock();
-      }
-      break;
-
-    case Screen::List:
-      if (back) {
-        finish();
-        return;
-      }
-      if (confirm) {
-        toggleSelected();
-      } else if (right) {
-        addHabit();
-      } else if (left && store.count() > 0) {
-        screen = Screen::Details;
-        requestUpdate();
-      } else if (store.count() > 0) {
-        const int itemCount = store.count();
-        buttonNavigator.onPressAndContinuous({Button::Down}, [this, itemCount] {
-          selectedIndex = ButtonNavigator::nextIndex(selectedIndex, itemCount);
-          requestUpdate();
-        });
-        buttonNavigator.onPressAndContinuous({Button::Up}, [this, itemCount] {
-          selectedIndex = ButtonNavigator::previousIndex(selectedIndex, itemCount);
-          requestUpdate();
-        });
       }
       break;
 
@@ -148,17 +128,88 @@ void HabitsActivity::loop() {
         deleteSelected();
       }
       break;
+
+    case Screen::List:
+      break;
   }
+  return true;
 }
 
-void HabitsActivity::render(RenderLock&&) {
+bool HabitsActivity::handleButtons() {
+  // Back finishes; Confirm activates (toggles) the selected row.
+  if (UiListActivity::handleButtons()) return true;
+
+  using Button = MappedInputManager::Button;
+  if (mappedInput.wasReleased(Button::Right)) {
+    addHabit();
+    return true;
+  }
+  if (mappedInput.wasReleased(Button::Left) && store.count() > 0) {
+    screen = Screen::Details;
+    requestUpdate();
+    return true;
+  }
+  return false;
+}
+
+void HabitsActivity::activateIndex(const int index) {
+  nav.selected = index;
+  // The toggle repaints the row it landed on; a lingering tap flash would gray
+  // an unrelated row on the next render.
+  app.clearTapFlash();
+  toggleSelected();
+}
+
+void HabitsActivity::buildScreen(UiScreen& uiScreen) {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  // Content below the GUI.drawHeader band, above the button hints.
+  uiScreen.setContentMarginFromScreen(fui::Insets{static_cast<int16_t>(metrics.topPadding + metrics.headerHeight), 0,
+                                                  static_cast<int16_t>(metrics.buttonHintsHeight), 0});
+  uiScreen.spacer(static_cast<int16_t>(metrics.verticalSpacing));
+
+  const uint32_t today = DateUtils::todayIndex();
+  const int count = store.count();
+  for (int i = 0; i < count; i++) {
+    const auto habit = static_cast<uint8_t>(i);
+    rowLabels[i] = std::string(store.isDone(habit, today) ? "[x] " : "[  ] ") + store.name(habit);
+    const uint16_t streak = store.currentStreak(habit, today);
+    if (streak == 0) {
+      rowValues[i].clear();
+    } else {
+      char buf[24];
+      snprintf(buf, sizeof(buf), "%u %s", streak, tr(STR_HB_DAYS));
+      rowValues[i] = buf;
+    }
+    rowItems[i].label = rowLabels[i].c_str();
+    rowItems[i].value = rowValues[i].empty() ? nullptr : rowValues[i].c_str();
+    rowItems[i].actionValue = static_cast<int16_t>(i);
+  }
+
+  fui::ListProps props;
+  props.items = rowItems;
+  props.count = static_cast<uint16_t>(count);
+  props.action = ACTION_ROW;
+  props.inputMask = fui::InputTouch;  // physical buttons stay in loop()
+  props.valueInset = 8;               // air between the streak and the row edge
+  syncListViewport(uiScreen, props);
+  uiScreen.list(props);
+}
+
+void HabitsActivity::render(RenderLock&& lock) {
+  // Only the populated list renders through the FreeInkUI app; the empty state
+  // and the three sub-screens are drawn directly, exactly as they always were.
+  if (screen == Screen::List && store.count() > 0) {
+    UiListActivity::render(std::move(lock));
+    return;
+  }
+
   renderer.clearScreen();
   switch (screen) {
     case Screen::NoClock:
       renderNoClock();
       break;
     case Screen::List:
-      renderList();
+      renderEmptyList();
       break;
     case Screen::Details:
       renderDetails();
@@ -176,6 +227,13 @@ void HabitsActivity::drawHeaderWithDate() {
   DateUtils::formatDay(date, sizeof(date), DateUtils::todayIndex());
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, renderer.getScreenWidth(), metrics.headerHeight}, tr(STR_HABITS),
                  date);
+}
+
+void HabitsActivity::drawChrome() { drawHeaderWithDate(); }
+
+void HabitsActivity::drawFooter() {
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_HB_TOGGLE), tr(STR_HB_DETAILS), tr(STR_HB_ADD));
+  GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 }
 
 void HabitsActivity::renderNoClock() {
@@ -197,39 +255,18 @@ void HabitsActivity::renderNoClock() {
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 }
 
-void HabitsActivity::renderList() {
+void HabitsActivity::renderEmptyList() {
   const auto& metrics = UITheme::getInstance().getMetrics();
-  const int pageWidth = renderer.getScreenWidth();
   const int pageHeight = renderer.getScreenHeight();
   drawHeaderWithDate();
 
   const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
   const int contentHeight = pageHeight - contentTop - metrics.buttonHintsHeight - metrics.verticalSpacing * 2;
-  const uint32_t today = DateUtils::todayIndex();
+  const int y = contentTop + contentHeight / 2 - renderer.getLineHeight(UI_12_FONT_ID);
+  renderer.drawCenteredText(UI_12_FONT_ID, y, tr(STR_HB_EMPTY), true, EpdFontFamily::BOLD);
+  renderer.drawCenteredText(UI_10_FONT_ID, y + renderer.getLineHeight(UI_12_FONT_ID) + 8, tr(STR_HB_EMPTY_HINT));
 
-  if (store.count() == 0) {
-    const int y = contentTop + contentHeight / 2 - renderer.getLineHeight(UI_12_FONT_ID);
-    renderer.drawCenteredText(UI_12_FONT_ID, y, tr(STR_HB_EMPTY), true, EpdFontFamily::BOLD);
-    renderer.drawCenteredText(UI_10_FONT_ID, y + renderer.getLineHeight(UI_12_FONT_ID) + 8, tr(STR_HB_EMPTY_HINT));
-  } else {
-    GUI.drawList(
-        renderer, Rect{0, contentTop, pageWidth, contentHeight}, store.count(), selectedIndex,
-        [this, today](int index) {
-          const auto habit = static_cast<uint8_t>(index);
-          return std::string(store.isDone(habit, today) ? "[x] " : "[  ] ") + store.name(habit);
-        },
-        nullptr, nullptr,
-        [this, today](int index) {
-          const uint16_t streak = store.currentStreak(static_cast<uint8_t>(index), today);
-          if (streak == 0) return std::string();
-          char buf[24];
-          snprintf(buf, sizeof(buf), "%u %s", streak, tr(STR_HB_DAYS));
-          return std::string(buf);
-        });
-  }
-
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_HB_TOGGLE), tr(STR_HB_DETAILS), tr(STR_HB_ADD));
-  GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
+  drawFooter();
 }
 
 void HabitsActivity::renderDetails() {
@@ -237,7 +274,7 @@ void HabitsActivity::renderDetails() {
   const int pageWidth = renderer.getScreenWidth();
   const int pageHeight = renderer.getScreenHeight();
   const uint32_t today = DateUtils::todayIndex();
-  const auto habit = static_cast<uint8_t>(selectedIndex);
+  const auto habit = static_cast<uint8_t>(selectedIndex());
   const bool doneToday = store.isDone(habit, today);
 
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, store.name(habit),
@@ -289,7 +326,7 @@ void HabitsActivity::drawGrid(int x, int y, int width, uint32_t today) {
   const int originX = x + (width - gridWidth) / 2;
   const uint32_t thisMonday = today - weekdayOf(today);
   const uint32_t firstMonday = thisMonday - static_cast<uint32_t>(GRID_WEEKS) * 7;
-  const auto habit = static_cast<uint8_t>(selectedIndex);
+  const auto habit = static_cast<uint8_t>(selectedIndex());
 
   for (int col = 0; col < columns; col++) {
     for (int row = 0; row < 7; row++) {
@@ -314,7 +351,7 @@ void HabitsActivity::renderConfirmDelete() {
 
   const int titleY = pageHeight / 2 - renderer.getLineHeight(UI_12_FONT_ID) - 6;
   renderer.drawCenteredText(UI_12_FONT_ID, titleY, tr(STR_HB_DELETE_CONFIRM), true, EpdFontFamily::BOLD);
-  const std::string name = renderer.truncatedText(UI_12_FONT_ID, store.name(static_cast<uint8_t>(selectedIndex)),
+  const std::string name = renderer.truncatedText(UI_12_FONT_ID, store.name(static_cast<uint8_t>(selectedIndex())),
                                                   pageWidth - SIDE_PADDING * 2);
   int y = titleY + renderer.getLineHeight(UI_12_FONT_ID) + 8;
   renderer.drawCenteredText(UI_12_FONT_ID, y, name.c_str());

@@ -12,7 +12,7 @@
 #include "OpdsServerStore.h"
 #include "activities/browser/OpdsBookBrowserActivity.h"
 #include "activities/home/FileBrowserActivity.h"
-#include "activities/home/RecentBooksActivity.h"
+#include "activities/library/LibraryListActivity.h"
 #include "activities/network/CrossPointWebServerActivity.h"
 #include "activities/settings/OpdsServerListActivity.h"
 #include "activities/settings/SettingsActivity.h"
@@ -43,10 +43,10 @@ AppRegistry::AppRegistry() {
       []() { return tr(STR_BROWSE_FILES); }, UIIcon::Folder,
       [](GfxRenderer& r, MappedInputManager& i) { return std::make_unique<FileBrowserActivity>(r, i); }));
 
-  // Recent Books
+  // Library (was Recent Books; the engine replaced RecentBooksActivity with the Library view in #3366)
   apps.push_back(std::make_unique<App>(
       []() { return tr(STR_MENU_RECENT_BOOKS); }, UIIcon::Recent,
-      [](GfxRenderer& r, MappedInputManager& i) { return std::make_unique<RecentBooksActivity>(r, i); }));
+      [](GfxRenderer& r, MappedInputManager& i) { return std::make_unique<LibraryListActivity>(r, i); }));
 
   // Dice App
   apps.push_back(std::make_unique<App>("Dice", UIIcon::Dice, [](GfxRenderer& r, MappedInputManager& i) {

@@ -939,10 +939,8 @@ void RssActivity::runBackgroundFetch() {
         std::string errorDetail;
         // Substack-style feeds embed every full post and run past 1 MB; the list only
         // needs the newest items, so cut the body and let the parser stop at the cut.
-        auto res = HttpDownloader::downloadToFile(url, xmlPath, nullptr,
-                                                  &cancelFetch, "", "", nullptr,
-                                                  nullptr, &errorDetail,
-                                                  MAX_FEED_BYTES);
+        auto res = HttpDownloader::downloadToFile(url, xmlPath, nullptr, &cancelFetch, "", "", false, nullptr,
+                                                  nullptr, &errorDetail, MAX_FEED_BYTES);
         if (res == HttpDownloader::OK) {
           fetchSuccess = true;
           break;
@@ -1020,7 +1018,7 @@ void RssActivity::downloadActivePost() {
       GUI.drawPopup(renderer, "Downloading...");
 
       auto result = HttpDownloader::downloadToFile(downloadUrl.c_str(), tempPath.c_str(), nullptr, nullptr, "", "",
-                                                   nullptr, nullptr, &downloadError);
+                                                   false, nullptr, nullptr, &downloadError);
       if (result == HttpDownloader::OK) {
         success = true;
         break;

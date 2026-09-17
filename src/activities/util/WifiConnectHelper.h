@@ -24,7 +24,7 @@ namespace WifiConnectHelper {
     WIFI_STORE.loadFromFile();
     const std::string lastSsid = WIFI_STORE.getLastConnectedSsid();
     if (!lastSsid.empty()) {
-      const auto* cred = WIFI_STORE.findCredential(lastSsid);
+      const auto cred = WIFI_STORE.findCredential(lastSsid);
       if (cred) {
         LOG_DBG("WIFI_HELP", "Auto-connecting to saved SSID: %s", lastSsid.c_str());
         WiFi.persistent(false);
@@ -47,7 +47,13 @@ namespace WifiConnectHelper {
     }
     
     // Loop through all other credentials saved in WIFI_STORE
-    for (const auto& cred : WIFI_STORE.getCredentials()) {
+    const size_t credentialCount = WIFI_STORE.getCredentialCount();
+    for (size_t i = 0; i < credentialCount; ++i) {
+      const auto stored = WIFI_STORE.getCredentialAt(i);
+      if (!stored) {
+        continue;
+      }
+      const WifiCredential& cred = *stored;
       if (cred.ssid == lastSsid) {
         continue;
       }

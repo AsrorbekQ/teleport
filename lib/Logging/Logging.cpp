@@ -1,6 +1,8 @@
 #include "Logging.h"
 
+#include <BoardConfig.h>
 #include <esp_log.h>
+#include <esp_rom_sys.h>
 
 #include <cstdarg>
 #include <string>
@@ -51,7 +53,14 @@ static int espLogToRing(const char* format, va_list args) {
   char buf[RECENT_ENTRY_LEN];
   vsnprintf(buf, sizeof(buf), format, args);
   addToRecentLogs(buf);
+  // Mirror logPrintf's transport: replacing the esp_log vprintf handler also
+  // takes over the IDF console, so boards on the ROM path would otherwise lose
+  // every component log to an HWCDC that reads false.
+#if FREEINK_LOG_TRANSPORT == FREEINK_LOG_TRANSPORT_ROM_PRINTF
+  esp_rom_printf("%s", buf);
+#else
   if (logSerial) logSerial.print(buf);
+#endif
   return 0;
 }
 
@@ -101,9 +110,16 @@ void logPrintf(const char* level, const char* origin, const char* format, ...) {
     }
   }
   va_end(args);
+#if FREEINK_LOG_TRANSPORT == FREEINK_LOG_TRANSPORT_ROM_PRINTF
+  // IDF/ROM console path for boards monitored over USB-Serial-JTAG, where the
+  // HWCDC `operator bool` reads false under `pio device monitor` and logs would
+  // otherwise be silently dropped (e.g. Sticky).
+  esp_rom_printf("%s", buf);
+#else
   if (logSerial) {
     logSerial.print(buf);
   }
+#endif
   addToLogRingBuffer(buf);
 }
 

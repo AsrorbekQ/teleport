@@ -1,4 +1,8 @@
 name: Compile Release
+
+# Build and attach firmware after a bare X.Y.Z tag is pushed. The tag supplies
+# both the source revision and the version in each asset name.
+
 on:
   push:
     tags:
@@ -7,19 +11,44 @@ on:
       # as 2.0.1 and every device would install as if it were stable.
       - '[0-9]+.[0-9]+.[0-9]+'
 
+permissions:
+  contents: read
+
 jobs:
   build-release:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - release_env: gh_release
+            device: x3-x4
+          - release_env: sticky-gh_release
+            device: sticky
+          - release_env: x4pro-gh_release
+            device: x4pro
+          - release_env: x4c-gh_release
+            device: x4c
+          - release_env: papermono-gh_release
+            device: papermono
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ github.ref_name }}
           submodules: recursive
+
+      # The device compares the release tag against the version baked into the
+      # binary, so a tag that disagrees with the ini publishes an image that can
+      # never satisfy its own update check. Fail before the build, not after.
+      - name: Validate release version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          grep -qxF "version = $TAG" platformio.ini || { echo "tag $TAG != [crosspoint] version in platformio.ini"; exit 1; }
 
       - uses: actions/setup-python@v6
         with:
-          python-version: '3.14'
+          python-version: '3.13'
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
@@ -28,43 +57,68 @@ jobs:
           enable-cache: false
 
       - name: Install PlatformIO Core
-        run: uv pip install --system -U https://github.com/pioarduino/platformio-core/archive/refs/tags/v6.1.19.zip
+        run: |
+          uv pip install --system -U https://github.com/pioarduino/platformio-core/archive/refs/tags/v6.1.19.zip
+          # platform-espressif32's builder/main.py imports these unconditionally; its own
+          # penv bootstrap (builder/penv_setup.py) is supposed to install them automatically
+          # but isn't picking them up reliably in this runner image, so pin them explicitly.
+          uv pip install --system -U "littlefs-python>=0.16.0" "fatfs-ng>=0.1.14" "pyyaml>=6.0.2" \
+            "rich-click>=1.8.6" "zopfli>=0.2.2" "intelhex>=2.3.0" "rich>=14.0.0" "urllib3<2" \
+            "cryptography>=45.0.3" "certifi>=2025.8.3" "ecdsa>=0.19.1" "bitstring>=4.3.1" \
+            "reedsolo>=1.5.3,<1.8" "esp-idf-size>=2.0.0" "esp-coredump>=1.14.0"
 
-      - name: Cache PlatformIO packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.platformio
-          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
-          restore-keys: pio-${{ runner.os }}-
-
-      # The device compares the release tag against the version baked into the
-      # binary, so a tag that disagrees with the ini publishes an image that can
-      # never satisfy its own update check. Fail before the build, not after.
       - name: Build CrossPoint
         env:
+          PIO_ENV: ${{ matrix.release_env }}
+        run: pio run -e "$PIO_ENV" -j1
+
+      - name: Prepare firmware assets
+        env:
+          PIO_ENV: ${{ matrix.release_env }}
           TAG: ${{ github.ref_name }}
+          DEVICE: ${{ matrix.device }}
         run: |
-          grep -qxF "version = $TAG" platformio.ini || { echo "tag $TAG != [crosspoint] version in platformio.ini"; exit 1; }
-          pio run -e gh_release
+          mkdir -p dist
+          cp ".pio/build/${PIO_ENV}/firmware.bin" "dist/crosspoint-${TAG}-${DEVICE}.bin"
+          # Teleport devices flashed before the engine's per-board asset naming
+          # look for a plain firmware.bin, so the C3 (X3/X4) image also ships
+          # under that name. Drop this once no device on 2.0.0 is left.
+          if [ "$DEVICE" = "x3-x4" ]; then
+            cp ".pio/build/${PIO_ENV}/firmware.bin" dist/firmware.bin
+          fi
 
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
+      - name: Stage firmware assets
+        uses: actions/upload-artifact@v6
         with:
-          name: Teleport-${{ github.ref_name }}
-          path: |
-            .pio/build/gh_release/bootloader.bin
-            .pio/build/gh_release/firmware.bin
-            .pio/build/gh_release/firmware.elf
-            .pio/build/gh_release/firmware.map
-            .pio/build/gh_release/partitions.bin
+          name: firmware-${{ matrix.device }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
 
-      # The asset has to be named exactly firmware.bin: ReleaseJsonParser
-      # strcmps that name when it scans the release JSON on the device.
+  publish-release:
+    needs: build-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download firmware assets
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      # firmware.bin has to keep that exact name: ReleaseJsonParser on older
+      # Teleport builds strcmps it when it scans the release JSON on the device.
       - name: Publish Release
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
         run: |
-          TAG="${{ github.ref_name }}"
-          gh release create "$TAG" .pio/build/gh_release/firmware.bin \
+          for device in x3-x4 sticky x4pro x4c papermono; do
+            test -f "dist/crosspoint-${TAG}-${device}.bin"
+          done
+          test -f dist/firmware.bin
+          gh release create "$TAG" dist/firmware.bin dist/crosspoint-*.bin \
             --title "Teleport $TAG" --generate-notes \
-            || gh release upload "$TAG" .pio/build/gh_release/firmware.bin --clobber
+            || gh release upload "$TAG" dist/firmware.bin dist/crosspoint-*.bin --clobber
